@@ -1,9 +1,14 @@
+
+
+# schema.py
+
 import graphene
-from graphene_django import DjangoObjectType
+from graphene_django.types import DjangoObjectType
+from graphql_jwt.decorators import login_required
 from .models import Login
 from django.contrib.auth.hashers import make_password, check_password
-from graphql import GraphQLError 
-
+from graphql import GraphQLError
+import graphql_jwt
 
 class LoginType(DjangoObjectType):
     class Meta:
@@ -37,7 +42,6 @@ class CreateLogin(graphene.Mutation):
         )
         login.save()
         return CreateLogin(login=login)
-
 
 class UpdateLogin(graphene.Mutation):
     login = graphene.Field(LoginType)
@@ -78,7 +82,7 @@ class UpdateLogin(graphene.Mutation):
             login.save()
             return UpdateLogin(login=login)
         except Login.DoesNotExist:
-            return None
+            raise GraphQLError('Login does not exist.')
 
 class DeleteLogin(graphene.Mutation):
     success = graphene.Boolean()
@@ -92,58 +96,44 @@ class DeleteLogin(graphene.Mutation):
             login.delete()
             return DeleteLogin(success=True)
         except Login.DoesNotExist:
-            return DeleteLogin(success=False)
-
-
+            raise GraphQLError('Login does not exist.')
 
 class LoginResponse(graphene.ObjectType):
     success = graphene.Boolean()
     message = graphene.String()
+    token = graphene.String()
     login = graphene.Field(LoginType)
 
 class LoginMutation(graphene.Mutation):
     class Arguments:
-        phoneNum = graphene.String(required=True)
+        phone_num = graphene.String(required=True)
         password = graphene.String(required=True)
 
     Output = LoginResponse
 
-    def mutate(self, info, phoneNum, password):
+    def mutate(self, info, phone_num, password):
         try:
-            user = Login.objects.get(phone_num=phoneNum)
+            user = Login.objects.get(phone_num=phone_num)
             if check_password(password, user.password):
-                return LoginResponse(success=True, login=user, message="Login successful")
+                token = graphql_jwt.shortcuts.get_token(user)
+                return LoginResponse(success=True, login=user, message="Login successful", token=token)
             else:
-                return LoginResponse(success=False, login=None, message="Invalid password")
+                raise GraphQLError('Invalid password')
         except Login.DoesNotExist:
-            return LoginResponse(success=False, login=None, message="Invalid phone number")
-
-
+            raise GraphQLError('User not found')
 
 class Query(graphene.ObjectType):
     all_logins = graphene.List(LoginType)
-    login_by_id = graphene.Field(LoginType, id=graphene.Int())
-    login_by_email = graphene.Field(LoginType, email=graphene.String())
 
+    @login_required
     def resolve_all_logins(root, info):
         return Login.objects.all()
 
-    def resolve_login_by_id(root, info, id):
-        try:
-            return Login.objects.get(pk=id)
-        except Login.DoesNotExist:
-            return None
-
-    def resolve_login_by_email(root, info, email):
-        try:
-            return Login.objects.get(email=email)
-        except Login.DoesNotExist:
-            return None
-
 class Mutation(graphene.ObjectType):
-    login = LoginMutation.Field()
+
     create_login = CreateLogin.Field()
     update_login = UpdateLogin.Field()
     delete_login = DeleteLogin.Field()
+    login = LoginMutation.Field()
 
 login_schema = graphene.Schema(query=Query, mutation=Mutation)
