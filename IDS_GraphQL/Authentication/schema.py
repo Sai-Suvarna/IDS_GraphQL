@@ -9,6 +9,8 @@ from .models import Login
 from django.contrib.auth.hashers import make_password, check_password
 from graphql import GraphQLError
 import graphql_jwt
+from graphql_jwt.shortcuts import get_token
+
 
 class LoginType(DjangoObjectType):
     class Meta:
@@ -115,7 +117,7 @@ class LoginMutation(graphene.Mutation):
         try:
             user = Login.objects.get(phone_num=phone_num)
             if check_password(password, user.password):
-                token = graphql_jwt.shortcuts.get_token(user)
+                token = get_token(user)
                 return LoginResponse(success=True, login=user, message="Login successful", token=token)
             else:
                 raise GraphQLError('Invalid password')
