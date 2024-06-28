@@ -9,6 +9,7 @@ graphene-file-upload
 pillow
 google-generativeai 
 django-graphql-jwt
+django-graphql-auth
 google-auth 
 google-auth-oauthlib 
 google-auth-httplib2 
