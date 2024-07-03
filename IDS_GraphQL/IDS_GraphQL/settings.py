@@ -27,10 +27,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = 'django-insecure-)0e5be#9fv9z-)8m_ns_r!&jugs$djcs9l7twx(0c5abuuf3oc'
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-)0e5be#9fv9z-)8m_ns_r!&jugs$djcs9l7twx(0c5abuuf3oc')
+# SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-)0e5be#9fv9z-)8m_ns_r!&jugs$djcs9l7twx(0c5abuuf3oc')
 # JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', '9a9d6ca22c332fd00c445fbabb3b55c73f52cbf3a690ac388d2b08ded3aadabc')
 
-
+SECRET_KEY='W2IjUe3kllnnZGWGDnRj8R3EukdojlSM8OlLUIJSvkA'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -46,16 +46,21 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'Object_Detection',
+    #installed_apps
     'graphene_django',
+    'graphql_jwt.refresh_token.apps.RefreshTokenConfig',
+    #local_apps
     'Authentication',
     'Core',
-    'graphql_auth',
-    'graphql_jwt',
-    'graphql_jwt.refresh_token.apps.RefreshTokenConfig',
+    'Object_Detection',
+    'idscore'
+    
+    # 'graphql_auth',
+    # 'graphql_jwt',
+    
 
 ]
-
+AUTH_USER_MODEL='Authentication.Login'
 MIDDLEWARE = [
 
     'django.middleware.security.SecurityMiddleware',
@@ -96,7 +101,7 @@ WSGI_APPLICATION = 'IDS_GraphQL.wsgi.application'
 
 
 GRAPHENE = {
-    'SCHEMA': 'IDS_GraphQl.schema.login_schema',  # Update with your project name
+    'SCHEMA': 'IDS_GraphQL.schema.schema',  # Update with your project name
        "MIDDLEWARE": [
             "graphql_jwt.middleware.JSONWebTokenMiddleware",
        ],
@@ -166,13 +171,23 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+import datetime
+GRAPHQL_JWT = {
+    'JWT_PAYLOAD_HANDLER': 'IDS_GraphQL.utils.jwt_payload',
+    'JWT_AUTH_HEADER_PREFIX': 'Bearer',
+    'JWT_VERIFY_EXPIRATION': True,
+    'JWT_LONG_RUNNING_REFRESH_TOKEN': True,
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(minutes=5),
+    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=7),    
+    'JWT_SECRET_KEY': 'W2IjUe3kllnnZGWGDnRj8R3EukdojlSM8OlLUIJSvkA',
+    'JWT_ALGORITHM': 'HS256',
+}
 
 AUTHENTICATION_BACKENDS = [
     'graphql_jwt.backends.JSONWebTokenBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
-import datetime
 
 # GRAPHQL_JWT = {
 #     'JWT_VERIFY_EXPIRATION': True,
@@ -186,12 +201,12 @@ import datetime
 #     'JWT_EXPIRATION_DELTA': datetime.timedelta(minutes=60),  # adjust as needed
 # }
 
-GRAPHQL_JWT = {
-    'JWT_VERIFY_EXPIRATION': True,
-    'JWT_SECRET_KEY': 'W2IjUe3kllnnZGWGDnRj8R3EukdojlSM8OlLUIJSvkA',
-    'JWT_PAYLOAD_HANDLER': 'graphql_jwt.utils.jwt_payload',
+# GRAPHQL_JWT = {
+#     'JWT_VERIFY_EXPIRATION': True,
+#     'JWT_SECRET_KEY': 'W2IjUe3kllnnZGWGDnRj8R3EukdojlSM8OlLUIJSvkA',
+#     # 'JWT_PAYLOAD_HANDLER': 'graphql_jwt.utils.jwt_payload',
 
-}
+# }
 
 # # JWT settings
 # JWT_AUTH = {
