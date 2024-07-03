@@ -201,6 +201,8 @@ class InventoryDetailType(graphene.ObjectType):
     quantityavailable = graphene.String()
 
 class ProductResponseType(graphene.ObjectType):
+    productid = graphene.Int()
+
     productcode = graphene.String()
     qrcode = graphene.String()
     productname = graphene.String()
@@ -213,6 +215,9 @@ class ProductResponseType(graphene.ObjectType):
     images = graphene.List(graphene.String)
     createduser = graphene.String()
     modifieduser = graphene.String()
+    createdtime = graphene.DateTime()
+    modifiedtime = graphene.DateTime()
+    rowstatus = graphene.Boolean()
     inventoryDetails = graphene.List(InventoryDetailType)
 
 
@@ -220,7 +225,9 @@ class ProductResponseType(graphene.ObjectType):
 
 class Query(graphene.ObjectType):
     product = graphene.Field(ProductType, id=graphene.Int(required=True))
-    all_products = graphene.List(ProductType)
+    # all_products = graphene.List(ProductType)
+    all_products = graphene.List(ProductResponseType)
+
     category = graphene.Field(CategoryType, id=graphene.Int(required=True))
     all_categories = graphene.List(CategoryType)
     inventory = graphene.Field(InventoryType, id=graphene.Int(required=True))
@@ -228,11 +235,58 @@ class Query(graphene.ObjectType):
     inventory_by_product = graphene.List(InventoryType, productid=graphene.Int(required=True))
     product_response = graphene.Field(ProductResponseType, productid=graphene.Int())
 
+
+
+    def resolve_all_products(self, info):
+        products = Product.objects.all()
+        product_responses = []
+
+        for product in products:
+            inventories = Inventory.objects.filter(productid=product)
+
+            inventory_details = []
+            for inventory in inventories:
+                inventory_detail = {
+                    'warehouseid': inventory.warehouseid.pk,
+                    'minstocklevel': inventory.minstocklevel,
+                    'maxstocklevel': inventory.maxstocklevel,
+                    'quantityavailable': inventory.quantityavailable
+                }
+                inventory_details.append(inventory_detail)
+
+            images_list = product.images
+            if isinstance(images_list, str):
+                images_list = json.loads(images_list)
+
+            product_response = ProductResponseType(
+                productid=product.pk,
+                productcode=product.productcode,
+                qrcode=product.qrcode,
+                productname=product.productname,
+                productdescription=product.productdescription,
+                productcategory=str(product.productcategory),
+                reorderpoint=product.reorderpoint,
+                brand=product.brand,
+                weight=product.weight,
+                dimensions=product.dimensions,
+                images=images_list,
+                createduser=product.createduser,
+                modifieduser=product.modifieduser,
+                createdtime=product.createdtime,
+                modifiedtime=product.modifiedtime,
+                rowstatus=product.rowstatus,
+                inventoryDetails=inventory_details
+            )
+            product_responses.append(product_response)
+
+        return product_responses
+
+
     def resolve_product(self, info, id):
         return Product.objects.get(pk=id)
 
-    def resolve_all_products(self, info):
-        return Product.objects.all()
+    # def resolve_all_products(self, info):
+    #     return Product.objects.all()
 
     def resolve_category(self, info, id):
         return Category.objects.get(pk=id, rowstatus=True)
