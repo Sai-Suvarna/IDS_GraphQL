@@ -236,6 +236,7 @@ class Query(graphene.ObjectType):
     product_response = graphene.Field(ProductResponseType, productid=graphene.Int())
 
 
+    @login_required
 
     def resolve_all_products(self, info):
         products = Product.objects.all()
