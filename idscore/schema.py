@@ -2,6 +2,8 @@ import json
 import graphene
 from graphene_django import DjangoObjectType
 from .models import Product, Inventory, Warehouse, Location, Category
+from graphql_jwt.decorators import login_required
+
 
 class ProductType(DjangoObjectType):
     class Meta:
@@ -30,7 +32,8 @@ class CreateCategory(graphene.Mutation):
         rowstatus = graphene.Boolean(default_value=True)
 
     category = graphene.Field(CategoryType)
-
+    
+    @login_required
     def mutate(self, info, name, image=None, rowstatus=True):
         category = Category(name=name, image=image, rowstatus=rowstatus)
         category.save()
@@ -45,7 +48,8 @@ class UpdateCategory(graphene.Mutation):
         rowstatus = graphene.Boolean()
 
     category = graphene.Field(CategoryType)
-
+    
+    @login_required
     def mutate(self, info, category_id, name=None, image=None, rowstatus=None):
         try:
             category = Category.objects.get(pk=category_id)
@@ -68,7 +72,8 @@ class DeleteCategory(graphene.Mutation):
         category_id = graphene.ID(required=True)
 
     category_id = graphene.ID()
-
+   
+    @login_required
     def mutate(self, info, category_id):
         try:
             category = Category.objects.get(pk=category_id)
@@ -103,6 +108,8 @@ class CreateProduct(graphene.Mutation):
 
     status_code = graphene.Int()
     message = graphene.String()
+
+    @login_required
 
     def mutate(self, info, productcode, qrcode, productname, productdescription, productcategory, reorderpoint, brand, weight, dimensions, images, createduser, modifieduser, inventory_details):
         try:
@@ -164,6 +171,8 @@ class CreateWarehouse(graphene.Mutation):
 
     warehouse = graphene.Field(WarehouseType)
 
+    @login_required
+
     def mutate(self, info, locationid, **kwargs):
         location = Location.objects.get(pk=locationid)
         warehouse = Warehouse.objects.create(locationid=location, **kwargs)
@@ -177,6 +186,8 @@ class CreateLocation(graphene.Mutation):
         modifieduser = graphene.String(required=True)
 
     location = graphene.Field(LocationType)
+
+    @login_required
 
     def mutate(self, info, **kwargs):
         location = Location.objects.create(**kwargs)
@@ -237,7 +248,8 @@ class Query(graphene.ObjectType):
     
     def resolve_inventory_by_product(self, info, productid):
         return Inventory.objects.filter(productid=productid)
-
+   
+    @login_required
     def resolve_product_response(self, info, productid=None):
         try:
             if productid is not None:
