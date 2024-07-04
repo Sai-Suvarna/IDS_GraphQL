@@ -28,7 +28,7 @@ class CategoryType(DjangoObjectType):
 class CreateCategory(graphene.Mutation):
     class Arguments:
         name = graphene.String(required=True)
-        image = graphene.String()  # Assuming you are storing image as a base64 encoded string
+        image = graphene.String()  
         rowstatus = graphene.Boolean(default_value=True)
 
     category = graphene.Field(CategoryType)
@@ -162,6 +162,114 @@ class CreateProduct(graphene.Mutation):
 
 
 
+class UpdateProduct(graphene.Mutation):
+    class Arguments:
+        product_id = graphene.ID(required=True)
+        productcode = graphene.String()
+        qrcode = graphene.String()
+        productname = graphene.String()
+        productdescription = graphene.String()
+        productcategory = graphene.String()
+        reorderpoint = graphene.Int()
+        brand = graphene.String()
+        weight = graphene.String()
+        dimensions = graphene.String()
+        images = graphene.List(graphene.String)
+        createduser = graphene.String()
+        modifieduser = graphene.String()
+        inventory_details = graphene.List(InventoryInputType)
+
+    status_code = graphene.Int()
+    message = graphene.String()
+
+    @login_required
+    def mutate(self, info, product_id, productcode=None, qrcode=None, productname=None, productdescription=None, productcategory=None, reorderpoint=None, brand=None, weight=None, dimensions=None, images=None, createduser=None, modifieduser=None, inventory_details=None):
+        try:
+            # Fetch the existing Product instance
+            product = Product.objects.get(pk=product_id)
+
+            # Update the product fields if provided
+            if productcode:
+                product.productcode = productcode
+            if qrcode:
+                product.qrcode = qrcode
+            if productname:
+                product.productname = productname
+            if productdescription:
+                product.productdescription = productdescription
+            if productcategory:
+                try:
+                    productcategory_id = int(productcategory)
+                except ValueError:
+                    category, created = Category.objects.get_or_create(name=productcategory)
+                    productcategory_id = category.category_id
+                product.productcategory = productcategory_id
+            if reorderpoint is not None:
+                product.reorderpoint = reorderpoint
+            if brand:
+                product.brand = brand
+            if weight:
+                product.weight = weight
+            if dimensions:
+                product.dimensions = dimensions
+            if images:
+                product.images = json.dumps(images)
+            if createduser:
+                product.createduser = createduser
+            if modifieduser:
+                product.modifieduser = modifieduser
+
+            product.save()
+
+            # Update Inventory instances
+            if inventory_details:
+                for inventory_detail in inventory_details:
+                    warehouse = Warehouse.objects.get(pk=inventory_detail['warehouseid'])
+                    inventory, created = Inventory.objects.update_or_create(
+                        productid=product,
+                        warehouseid=warehouse,
+                        defaults={
+                            'quantityavailable': inventory_detail['quantityavailable'],
+                            'minstocklevel': inventory_detail['minstocklevel'],
+                            'maxstocklevel': inventory_detail['maxstocklevel'],
+                            'reorderpoint': reorderpoint if reorderpoint is not None else product.reorderpoint,
+                            'createduser': createduser if createduser else product.createduser,
+                            'modifieduser': modifieduser if modifieduser else product.modifieduser
+                        }
+                    )
+
+            return UpdateProduct(status_code=200, message="Product and inventories updated successfully.")
+        except Product.DoesNotExist:
+            return UpdateProduct(status_code=404, message="Product not found.")
+        except Exception as e:
+            return UpdateProduct(status_code=400, message=str(e))
+
+
+
+class DeleteProduct(graphene.Mutation):
+    class Arguments:
+        product_id = graphene.ID(required=True)
+
+    product_id = graphene.ID()
+
+    @login_required
+    def mutate(self, info, product_id):
+        try:
+            product = Product.objects.get(pk=product_id)
+            product.rowstatus = False  # Soft delete by setting rowstatus to False
+            product.save()
+
+            # Update corresponding inventory rows
+            inventories = Inventory.objects.filter(productid=product)
+            for inventory in inventories:
+                inventory.rowstatus = False
+                inventory.save()
+
+            return DeleteProduct(product_id=product_id)
+        except Product.DoesNotExist:
+            raise Exception(f"Product with id {product_id} does not exist.")
+
+
 class CreateWarehouse(graphene.Mutation):
     class Arguments:
         locationid = graphene.ID(required=True)
@@ -172,7 +280,6 @@ class CreateWarehouse(graphene.Mutation):
     warehouse = graphene.Field(WarehouseType)
 
     @login_required
-
     def mutate(self, info, locationid, **kwargs):
         location = Location.objects.get(pk=locationid)
         warehouse = Warehouse.objects.create(locationid=location, **kwargs)
@@ -188,7 +295,6 @@ class CreateLocation(graphene.Mutation):
     location = graphene.Field(LocationType)
 
     @login_required
-
     def mutate(self, info, **kwargs):
         location = Location.objects.create(**kwargs)
         return CreateLocation(location=location)
@@ -236,10 +342,9 @@ class Query(graphene.ObjectType):
     product_response = graphene.Field(ProductResponseType, productid=graphene.Int())
 
 
-    @login_required
-
+    @login_required                       
     def resolve_all_products(self, info):
-        products = Product.objects.all()
+        products = Product.objects.filter(rowstatus=True)
         product_responses = []
 
         for product in products:
@@ -289,18 +394,23 @@ class Query(graphene.ObjectType):
     # def resolve_all_products(self, info):
     #     return Product.objects.all()
 
+    @login_required                       
     def resolve_category(self, info, id):
         return Category.objects.get(pk=id, rowstatus=True)
-
+    
+    @login_required                       
     def resolve_all_categories(self, info):
         return Category.objects.filter(rowstatus=True)
     
+    @login_required                       
     def resolve_inventory(self, info, id):
         return Inventory.objects.get(pk=id)
-
+    
+    @login_required                       
     def resolve_all_inventories(self, info):
         return Inventory.objects.all()
     
+    @login_required                       
     def resolve_inventory_by_product(self, info, productid):
         return Inventory.objects.filter(productid=productid)
    
@@ -308,7 +418,7 @@ class Query(graphene.ObjectType):
     def resolve_product_response(self, info, productid=None):
         try:
             if productid is not None:
-                product = Product.objects.get(pk=productid)
+                product = Product.objects.get(pk=productid,rowstatus=True)
             
             else:
                 raise Exception("Either productid or productcode must be provided")
@@ -345,7 +455,10 @@ class Query(graphene.ObjectType):
 
 
 class Mutation(graphene.ObjectType):
+    update_product = UpdateProduct.Field()
     create_product = CreateProduct.Field()
+    delete_product = DeleteProduct.Field()
+
     create_warehouse = CreateWarehouse.Field()
     create_location = CreateLocation.Field()
     create_category = CreateCategory.Field()
