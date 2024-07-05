@@ -7,7 +7,6 @@ class Category(models.Model):
     name = models.CharField(max_length=255, unique=True)
     image = models.URLField(null=True, blank=True)  # Store image as URL
     rowstatus = models.BooleanField(default=True)
-    # productcategory = models.ForeignKey(Category, on_delete=models.CASCADE)
 
 class Product(models.Model):
     productid = models.AutoField(primary_key=True)
@@ -78,3 +77,19 @@ class Location(models.Model):
 
     def __str__(self):
         return self.locationname
+    
+
+class Batch(models.Model):
+    batchid = models.AutoField(primary_key=True)
+    productid = models.ForeignKey('Product', on_delete=models.CASCADE)
+    manufacturedate = models.DateField()
+    expirydate = models.DateField()
+    quantity = models.CharField()
+    createduser = models.CharField(max_length=100)
+    modifieduser = models.CharField(max_length=100)
+    createdtime = models.DateTimeField(auto_now_add=True)
+    modifiedtime = models.DateTimeField(auto_now=True)
+    rowstatus = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f'Batch {self.batchid} for {self.productid}'
