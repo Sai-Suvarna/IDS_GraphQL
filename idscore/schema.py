@@ -107,7 +107,7 @@ class InventoryInputType(graphene.InputObjectType):
     warehouseid = graphene.Int(required=True)
     minstocklevel = graphene.String(required=True)
     maxstocklevel = graphene.String(required=True)
-    quantityavailable = graphene.String(required=True)
+    quantityavailable = graphene.String()
 
 class CreateProduct(graphene.Mutation):
     class Arguments:
@@ -120,7 +120,7 @@ class CreateProduct(graphene.Mutation):
         brand = graphene.String(required=True)
         weight = graphene.String(required=True)
         dimensions = graphene.String(required=True)
-        images = graphene.List(graphene.String, required=True)
+        images = graphene.List(graphene.String)
         createduser = graphene.String(required=True)
         modifieduser = graphene.String(required=True)
         inventory_details = graphene.List(InventoryInputType, required=True)
