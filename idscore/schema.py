@@ -1,11 +1,14 @@
 import json
 import graphene
 from graphene_django import DjangoObjectType
-from .models import Product, Inventory, Warehouse, Location, Category
+from .models import Product, Inventory, Warehouse, Location, Category, Batch
+# from .types import ProductType, InventoryType, WarehouseType,LocationType, CategoryType, BatchType
 from graphql_jwt.decorators import login_required
 
 
+
 class ProductType(DjangoObjectType):
+
     class Meta:
         model = Product
 
@@ -13,17 +16,33 @@ class InventoryType(DjangoObjectType):
     class Meta:
         model = Inventory
 
-class WarehouseType(DjangoObjectType):
-    class Meta:
-        model = Warehouse
 
 class LocationType(DjangoObjectType):
     class Meta:
         model = Location
 
+class WarehouseType(DjangoObjectType):
+    class Meta:
+        model = Warehouse
+
+    location = graphene.Field(LocationType)
+
+    def resolve_location(self, info):
+        return self.locationid
+
+
+
 class CategoryType(DjangoObjectType):
     class Meta:
         model = Category
+
+class BatchType(DjangoObjectType):
+    class Meta:
+        model = Batch
+
+
+
+
 
 class CreateCategory(graphene.Mutation):
     class Arguments:
@@ -299,7 +318,72 @@ class CreateLocation(graphene.Mutation):
         location = Location.objects.create(**kwargs)
         return CreateLocation(location=location)
 
-    
+
+class CreateBatch(graphene.Mutation):
+    class Arguments:
+        productid = graphene.Int(required=True)
+        manufacturedate = graphene.Date(required=True)
+        expirydate = graphene.Date(required=True)
+        quantity = graphene.String(required=True)
+        createduser = graphene.String(required=True)
+        modifieduser = graphene.String(required=True)
+
+    batch = graphene.Field(BatchType)
+
+    def mutate(self, info, productid, manufacturedate, expirydate, quantity, createduser, modifieduser):
+        product = Product.objects.get(pk=productid)
+        batch = Batch(
+            productid=product,
+            manufacturedate=manufacturedate,
+            expirydate=expirydate,
+            quantity=quantity,
+            createduser=createduser,
+            modifieduser=modifieduser
+        )
+        batch.save()
+        return CreateBatch(batch=batch)
+
+class UpdateBatch(graphene.Mutation):
+    class Arguments:
+        batchid = graphene.Int(required=True)
+        manufacturedate = graphene.Date()
+        expirydate = graphene.Date()
+        quantity = graphene.String()
+        modifieduser = graphene.String()
+
+    batch = graphene.Field(BatchType)
+
+    def mutate(self, info, batchid, manufacturedate=None, expirydate=None, quantity=None, modifieduser=None):
+        batch = Batch.objects.get(pk=batchid)
+        if manufacturedate:
+            batch.manufacturedate = manufacturedate
+        if expirydate:
+            batch.expirydate = expirydate
+        if quantity:
+            batch.quantity = quantity
+        if modifieduser:
+            batch.modifieduser = modifieduser
+        batch.save()
+        return UpdateBatch(batch=batch)
+
+
+class DeleteBatch(graphene.Mutation):
+    class Arguments:
+        batchid = graphene.Int(required=True)
+
+    success = graphene.Boolean()
+
+    def mutate(self, info, batchid):
+        try:
+            batch = Batch.objects.get(pk=batchid)
+            batch.rowstatus = False  # Soft delete
+            batch.save()
+            success = True
+        except Batch.DoesNotExist:
+            success = False
+        return DeleteBatch(success=success)
+
+
 class InventoryDetailType(graphene.ObjectType):
     warehouseid = graphene.Int()
     minstocklevel = graphene.String()
@@ -308,12 +392,12 @@ class InventoryDetailType(graphene.ObjectType):
 
 class ProductResponseType(graphene.ObjectType):
     productid = graphene.Int()
-
     productcode = graphene.String()
     qrcode = graphene.String()
     productname = graphene.String()
     productdescription = graphene.String()
     productcategory = graphene.String()
+    category_name = graphene.String()
     reorderpoint = graphene.Int()
     brand = graphene.String()
     weight = graphene.String()
@@ -325,8 +409,6 @@ class ProductResponseType(graphene.ObjectType):
     modifiedtime = graphene.DateTime()
     rowstatus = graphene.Boolean()
     inventoryDetails = graphene.List(InventoryDetailType)
-
-
 
 
 class Query(graphene.ObjectType):
@@ -341,6 +423,27 @@ class Query(graphene.ObjectType):
     inventory_by_product = graphene.List(InventoryType, productid=graphene.Int(required=True))
     product_response = graphene.Field(ProductResponseType, productid=graphene.Int())
 
+
+    all_warehouses = graphene.List(WarehouseType)
+    all_locations = graphene.List(LocationType)
+    warehouse = graphene.Field(WarehouseType, id=graphene.ID(required=True))
+    location = graphene.Field(LocationType, id=graphene.ID(required=True))
+
+    @login_required                       
+    def resolve_all_warehouses(self, info, **kwargs):
+        return Warehouse.objects.all()
+
+    @login_required                       
+    def resolve_all_locations(self, info, **kwargs):
+        return Location.objects.all()
+
+    @login_required                       
+    def resolve_warehouse(self, info, id, **kwargs):
+        return Warehouse.objects.get(pk=id)
+
+    @login_required                       
+    def resolve_location(self, info, id, **kwargs):
+        return Location.objects.get(pk=id)
 
     @login_required                       
     def resolve_all_products(self, info):
@@ -364,6 +467,11 @@ class Query(graphene.ObjectType):
             if isinstance(images_list, str):
                 images_list = json.loads(images_list)
 
+            # Fetch category name using the category ID
+            category = Category.objects.get(pk=product.productcategory)
+            category_name = category.name
+
+
             product_response = ProductResponseType(
                 productid=product.pk,
                 productcode=product.productcode,
@@ -371,6 +479,8 @@ class Query(graphene.ObjectType):
                 productname=product.productname,
                 productdescription=product.productdescription,
                 productcategory=str(product.productcategory),
+                category_name=category_name,
+
                 reorderpoint=product.reorderpoint,
                 brand=product.brand,
                 weight=product.weight,
@@ -435,12 +545,20 @@ class Query(graphene.ObjectType):
                 }
                 inventory_details.append(inventory_detail)
 
+
+            # Fetch category name using the category ID
+            category = Category.objects.get(pk=product.productcategory)
+            category_name = category.name
+
+
             return ProductResponseType(
                 productcode=product.productcode,
                 qrcode=product.qrcode,
                 productname=product.productname,
                 productdescription=product.productdescription,
                 productcategory=str(product.productcategory),
+                category_name=category_name,
+
                 reorderpoint=product.reorderpoint,
                 brand=product.brand,
                 weight=product.weight,
@@ -461,8 +579,13 @@ class Mutation(graphene.ObjectType):
 
     create_warehouse = CreateWarehouse.Field()
     create_location = CreateLocation.Field()
+
     create_category = CreateCategory.Field()
     update_category = UpdateCategory.Field()
     delete_category = DeleteCategory.Field()
+
+    create_batch = CreateBatch.Field()
+    update_batch = UpdateBatch.Field()
+    delete_batch = DeleteBatch.Field()
 
 idscore_schema = graphene.Schema(query=Query, mutation=Mutation)
