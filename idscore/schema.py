@@ -1,21 +1,16 @@
 import json
 import graphene
 from graphene_django import DjangoObjectType
-from .models import Product, Inventory, Warehouse, Location, Category, Batch
-# from .types import ProductType, InventoryType, WarehouseType,LocationType, CategoryType, BatchType
+from .models import Product, Inventory, Warehouse, Location, Category, Batch, Placement
 from graphql_jwt.decorators import login_required
 
-
-
 class ProductType(DjangoObjectType):
-
     class Meta:
         model = Product
 
 class InventoryType(DjangoObjectType):
     class Meta:
         model = Inventory
-
 
 class LocationType(DjangoObjectType):
     class Meta:
@@ -30,8 +25,6 @@ class WarehouseType(DjangoObjectType):
     def resolve_location(self, info):
         return self.locationid
 
-
-
 class CategoryType(DjangoObjectType):
     class Meta:
         model = Category
@@ -40,9 +33,9 @@ class BatchType(DjangoObjectType):
     class Meta:
         model = Batch
 
-
-
-
+class PlacementType(DjangoObjectType):
+    class Meta:
+        model = Placement
 
 class CreateCategory(graphene.Mutation):
     class Arguments:
@@ -51,12 +44,18 @@ class CreateCategory(graphene.Mutation):
         rowstatus = graphene.Boolean(default_value=True)
 
     category = graphene.Field(CategoryType)
+    status_code = graphene.Int()
+    message = graphene.String()
     
     @login_required
     def mutate(self, info, name, image=None, rowstatus=True):
-        category = Category(name=name, image=image, rowstatus=rowstatus)
-        category.save()
-        return CreateCategory(category=category)
+        try:
+            category = Category(name=name, image=image, rowstatus=rowstatus)
+            category.save()
+            return CreateCategory(category=category, status_code=200, message="Category created successfully.")
+        except Exception as e:
+            return CreateCategory(status_code=400, message=str(e))
+
 
 
 class UpdateCategory(graphene.Mutation):
@@ -67,6 +66,8 @@ class UpdateCategory(graphene.Mutation):
         rowstatus = graphene.Boolean()
 
     category = graphene.Field(CategoryType)
+    status_code = graphene.Int()
+    message = graphene.String()
     
     @login_required
     def mutate(self, info, category_id, name=None, image=None, rowstatus=None):
@@ -75,15 +76,18 @@ class UpdateCategory(graphene.Mutation):
         except Category.DoesNotExist:
             raise Exception(f"Category with id {category_id} does not exist.")
 
-        if name is not None:
-            category.name = name
-        if image is not None:
-            category.image = image
-        if rowstatus is not None:
-            category.rowstatus = rowstatus
+        try:
+            if name is not None:
+                category.name = name
+            if image is not None:
+                category.image = image
+            if rowstatus is not None:
+                category.rowstatus = rowstatus
 
-        category.save()
-        return UpdateCategory(category=category)
+            category.save()
+            return UpdateCategory(category=category, status_code=200, message="Category updated successfully.")
+        except Exception as e:
+            return UpdateCategory(status_code=400, message=str(e))
 
 
 class DeleteCategory(graphene.Mutation):
@@ -91,6 +95,8 @@ class DeleteCategory(graphene.Mutation):
         category_id = graphene.ID(required=True)
 
     category_id = graphene.ID()
+    status_code = graphene.Int()
+    message = graphene.String()
    
     @login_required
     def mutate(self, info, category_id):
@@ -98,9 +104,11 @@ class DeleteCategory(graphene.Mutation):
             category = Category.objects.get(pk=category_id)
             category.rowstatus = False  # Soft delete by setting rowstatus to False
             category.save()
-            return DeleteCategory(category_id=category_id)
+            return DeleteCategory(category_id=category_id, status_code=200, message="Category deleted successfully.")
         except Category.DoesNotExist:
             raise Exception(f"Category with id {category_id} does not exist.")
+        except Exception as e:
+            return DeleteCategory(status_code=400, message=str(e))
 
 
 class InventoryInputType(graphene.InputObjectType):
@@ -178,7 +186,6 @@ class CreateProduct(graphene.Mutation):
             return CreateProduct(status_code=200, message="Product and inventories created successfully.")
         except Exception as e:
             return CreateProduct(status_code=400, message=str(e))
-
 
 
 class UpdateProduct(graphene.Mutation):
@@ -264,12 +271,13 @@ class UpdateProduct(graphene.Mutation):
             return UpdateProduct(status_code=400, message=str(e))
 
 
-
 class DeleteProduct(graphene.Mutation):
     class Arguments:
         product_id = graphene.ID(required=True)
 
     product_id = graphene.ID()
+    status_code = graphene.Int()
+    message = graphene.String()
 
     @login_required
     def mutate(self, info, product_id):
@@ -284,10 +292,11 @@ class DeleteProduct(graphene.Mutation):
                 inventory.rowstatus = False
                 inventory.save()
 
-            return DeleteProduct(product_id=product_id)
+            return DeleteProduct(product_id=product_id, status_code=200, message="Product deleted successfully.")
         except Product.DoesNotExist:
             raise Exception(f"Product with id {product_id} does not exist.")
-
+        except Exception as e:
+            return DeleteProduct(status_code=400, message=str(e))
 
 class CreateWarehouse(graphene.Mutation):
     class Arguments:
@@ -297,12 +306,24 @@ class CreateWarehouse(graphene.Mutation):
         modifieduser = graphene.String(required=True)
 
     warehouse = graphene.Field(WarehouseType)
+    status_code = graphene.Int()
+    message = graphene.String()
 
     @login_required
-    def mutate(self, info, locationid, **kwargs):
-        location = Location.objects.get(pk=locationid)
-        warehouse = Warehouse.objects.create(locationid=location, **kwargs)
-        return CreateWarehouse(warehouse=warehouse)
+    def mutate(self, info, locationid, warehousename, createduser, modifieduser):
+        try:
+            location = Location.objects.get(pk=locationid)
+            warehouse = Warehouse.objects.create(
+                locationid=location,
+                warehousename=warehousename,
+                createduser=createduser,
+                modifieduser=modifieduser
+            )
+            return CreateWarehouse(warehouse=warehouse, status_code=200, message="Warehouse created successfully.")
+        except Location.DoesNotExist:
+            raise Exception(f"Location with id {locationid} does not exist.")
+        except Exception as e:
+            return CreateWarehouse(status_code=400, message=str(e))
 
 class CreateLocation(graphene.Mutation):
     class Arguments:
@@ -312,14 +333,27 @@ class CreateLocation(graphene.Mutation):
         modifieduser = graphene.String(required=True)
 
     location = graphene.Field(LocationType)
+    status_code = graphene.Int()
+    message = graphene.String()
 
     @login_required
-    def mutate(self, info, **kwargs):
-        location = Location.objects.create(**kwargs)
-        return CreateLocation(location=location)
-
+    def mutate(self, info, locationname, locationaddress, createduser, modifieduser):
+        try:
+            location = Location.objects.create(
+                locationname=locationname,
+                locationaddress=locationaddress,
+                createduser=createduser,
+                modifieduser=modifieduser
+            )
+            return CreateLocation(location=location, status_code=200, message="Location created successfully.")
+        except Exception as e:
+            return CreateLocation(status_code=400, message=str(e))
 
 class CreateBatch(graphene.Mutation):
+    batch = graphene.Field(BatchType)
+    status_code = graphene.Int()
+    message = graphene.String()
+
     class Arguments:
         productid = graphene.Int(required=True)
         manufacturedate = graphene.Date(required=True)
@@ -327,61 +361,202 @@ class CreateBatch(graphene.Mutation):
         quantity = graphene.String(required=True)
         createduser = graphene.String(required=True)
         modifieduser = graphene.String(required=True)
+        rowstatus = graphene.Boolean()
 
-    batch = graphene.Field(BatchType)
+    @login_required
+    def mutate(self, info, productid, manufacturedate, expirydate, quantity, createduser, modifieduser, rowstatus=True):
+        try:
+            product = Product.objects.get(productid=productid)
+            batch = Batch(
+                productid=product,
+                manufacturedate=manufacturedate,
+                expirydate=expirydate,
+                quantity=quantity,
+                createduser=createduser,
+                modifieduser=modifieduser,
+                rowstatus=rowstatus
+            )
+            batch.save()
+            return CreateBatch(batch=batch, status_code=200, message="Batch created successfully.")
+        except Exception as e:
+            return CreateBatch(status_code=400, message=str(e))
 
-    def mutate(self, info, productid, manufacturedate, expirydate, quantity, createduser, modifieduser):
-        product = Product.objects.get(pk=productid)
-        batch = Batch(
-            productid=product,
-            manufacturedate=manufacturedate,
-            expirydate=expirydate,
-            quantity=quantity,
-            createduser=createduser,
-            modifieduser=modifieduser
-        )
-        batch.save()
-        return CreateBatch(batch=batch)
 
 class UpdateBatch(graphene.Mutation):
+    batch = graphene.Field(BatchType)
+    status_code = graphene.Int()
+    message = graphene.String()
+
     class Arguments:
         batchid = graphene.Int(required=True)
-        manufacturedate = graphene.Date()
-        expirydate = graphene.Date()
-        quantity = graphene.String()
-        modifieduser = graphene.String()
+        productid = graphene.Int(required=False)
+        manufacturedate = graphene.Date(required=False)
+        expirydate = graphene.Date(required=False)
+        quantity = graphene.String(required=False)
+        createduser = graphene.String(required=False)
+        modifieduser = graphene.String(required=False)
+        rowstatus = graphene.Boolean(required=False)
 
-    batch = graphene.Field(BatchType)
 
-    def mutate(self, info, batchid, manufacturedate=None, expirydate=None, quantity=None, modifieduser=None):
-        batch = Batch.objects.get(pk=batchid)
-        if manufacturedate:
-            batch.manufacturedate = manufacturedate
-        if expirydate:
-            batch.expirydate = expirydate
-        if quantity:
-            batch.quantity = quantity
-        if modifieduser:
-            batch.modifieduser = modifieduser
-        batch.save()
-        return UpdateBatch(batch=batch)
+    @login_required
+    def mutate(self, info, batchid, **kwargs):
+        try:
+            batch = Batch.objects.get(batchid=batchid)
+            productid = kwargs.get('productid')
+            if productid:
+                batch.productid = Product.objects.get(productid=productid)
+            for key, value in kwargs.items():
+                if key != 'productid':
+                    setattr(batch, key, value)
+            batch.save()
+            return UpdateBatch(batch=batch, status_code=200, message="Batch updated successfully.")
+        except Exception as e:
+            return UpdateBatch(status_code=400, message=str(e))
 
 
 class DeleteBatch(graphene.Mutation):
+    status_code = graphene.Int()
+    message = graphene.String()
+
     class Arguments:
         batchid = graphene.Int(required=True)
 
-    success = graphene.Boolean()
-
+    @login_required
     def mutate(self, info, batchid):
         try:
-            batch = Batch.objects.get(pk=batchid)
-            batch.rowstatus = False  # Soft delete
+            batch = Batch.objects.get(batchid=batchid)
+            batch.rowstatus = False
             batch.save()
-            success = True
+            return DeleteBatch(status_code=200, message="Batch deleted successfully (soft delete).")
         except Batch.DoesNotExist:
-            success = False
-        return DeleteBatch(success=success)
+            return DeleteBatch(status_code=404, message="Batch not found.")
+        except Exception as e:
+            return DeleteBatch(status_code=400, message=str(e))
+
+
+class CreatePlacement(graphene.Mutation):
+    class Arguments:
+        productid = graphene.Int(required=True)
+        warehouseid = graphene.Int(required=True)
+        aile = graphene.String(required=True)
+        bin = graphene.String(required=True)
+        batchid = graphene.Int(required=True)
+        createduser = graphene.String(required=True)
+        modifieduser = graphene.String(required=True)
+
+    placement = graphene.Field(PlacementType)
+    status_code = graphene.Int()
+    message = graphene.String()
+
+    @login_required
+    def mutate(self, info, productid, warehouseid, aile, bin, batchid, createduser, modifieduser):
+        try:
+            product = Product.objects.get(pk=productid)
+            warehouse = Warehouse.objects.get(pk=warehouseid)
+            batch = Batch.objects.get(pk=batchid)
+
+            placement = Placement.objects.create(
+                productid=product,
+                warehouseid=warehouse,
+                aile=aile,
+                bin=bin,
+                batchid=batch,
+                createduser=createduser,
+                modifieduser=modifieduser
+            )
+
+            return CreatePlacement(placement=placement, status_code=200, message="Placement created successfully.")
+        except Product.DoesNotExist:
+            raise Exception(f"Product with id {productid} does not exist.")
+        except Warehouse.DoesNotExist:
+            raise Exception(f"Warehouse with id {warehouseid} does not exist.")
+        except Batch.DoesNotExist:
+            raise Exception(f"Batch with id {batchid} does not exist.")
+        except Exception as e:
+            return CreatePlacement(status_code=400, message=str(e))
+
+
+class UpdatePlacement(graphene.Mutation):
+    class Arguments:
+        placementId = graphene.Int(required=True)
+        productid = graphene.Int()
+        warehouseid = graphene.Int()
+        aile = graphene.String()
+        bin = graphene.String()
+        batchid = graphene.Int()
+        createduser = graphene.String()
+        modifieduser = graphene.String()
+
+    placement = graphene.Field(PlacementType)
+    status_code = graphene.Int()
+    message = graphene.String()
+
+    @login_required
+    def mutate(self, info, placementId, **kwargs):
+        try:
+            placement = Placement.objects.get(pk=placementId)
+
+            productid = kwargs.get('productid')
+            if productid:
+                try:
+                    product_instance = Product.objects.get(pk=productid)
+                    placement.productid = product_instance
+                except Product.DoesNotExist:
+                    raise Exception(f"Product with id {productid} does not exist.")
+
+            warehouseid = kwargs.get('warehouseid')
+            if warehouseid:
+                try:
+                    warehouse_instance = Warehouse.objects.get(pk=warehouseid)
+                    placement.warehouseid = warehouse_instance
+                except Warehouse.DoesNotExist:
+                    raise Exception(f"Warehouse with id {warehouseid} does not exist.")
+
+            batchid = kwargs.get('batchid')
+            if batchid:
+                try:
+                    batch_instance = Batch.objects.get(pk=batchid)
+                    placement.batchid = batch_instance
+                except Batch.DoesNotExist:
+                    raise Exception(f"Batch with id {batchid} does not exist.")
+
+            for key, value in kwargs.items():
+                if key in ['aile', 'bin', 'createduser', 'modifieduser']:
+                    setattr(placement, key, value)
+
+            placement.save()
+
+            return UpdatePlacement(placement=placement, status_code=200, message="Placement updated successfully.")
+        except Placement.DoesNotExist:
+            raise Exception(f"Placement with id {placementId} does not exist.")
+        except Exception as e:
+            return UpdatePlacement(status_code=400, message=str(e))
+
+
+class DeletePlacement(graphene.Mutation):
+    class Arguments:
+        placementId = graphene.Int(required=True)
+
+    status_code = graphene.Int()
+    message = graphene.String()
+
+    @login_required
+    def mutate(self, info, placementId):
+        try:
+            placement = Placement.objects.get(pk=placementId)
+            placement.rowstatus = False  # Soft delete by setting rowstatus to False
+            placement.save()
+
+            return DeletePlacement(status_code=200, message="Placement deleted successfully.")
+        except Placement.DoesNotExist:
+            raise Exception(f"Placement with id {placementId} does not exist.")
+        except Exception as e:
+            return DeletePlacement(status_code=400, message=str(e))
+
+
+
+
+
 
 
 class InventoryDetailType(graphene.ObjectType):
@@ -412,22 +587,57 @@ class ProductResponseType(graphene.ObjectType):
 
 
 class Query(graphene.ObjectType):
-    product = graphene.Field(ProductType, id=graphene.Int(required=True))
-    # all_products = graphene.List(ProductType)
-    all_products = graphene.List(ProductResponseType)
 
-    category = graphene.Field(CategoryType, id=graphene.Int(required=True))
-    all_categories = graphene.List(CategoryType)
-    inventory = graphene.Field(InventoryType, id=graphene.Int(required=True))
-    all_inventories = graphene.List(InventoryType)
-    inventory_by_product = graphene.List(InventoryType, productid=graphene.Int(required=True))
+    product = graphene.Field(ProductType, id=graphene.Int(required=True))
+    all_products = graphene.List(ProductResponseType)
     product_response = graphene.Field(ProductResponseType, productid=graphene.Int())
 
 
-    all_warehouses = graphene.List(WarehouseType)
-    all_locations = graphene.List(LocationType)
+    category = graphene.Field(CategoryType, id=graphene.Int(required=True))
+    all_categories = graphene.List(CategoryType)
+
+    inventory = graphene.Field(InventoryType, id=graphene.Int(required=True))
+    all_inventories = graphene.List(InventoryType)
+    inventory_by_product = graphene.List(InventoryType, productid=graphene.Int(required=True))
+
     warehouse = graphene.Field(WarehouseType, id=graphene.ID(required=True))
+    all_warehouses = graphene.List(WarehouseType)
+
+    all_locations = graphene.List(LocationType)
     location = graphene.Field(LocationType, id=graphene.ID(required=True))
+
+    all_batches = graphene.List(BatchType)
+    batch_by_id = graphene.Field(BatchType, batchid=graphene.Int(required=True))
+
+    allPlacements = graphene.List(PlacementType)
+    placementById = graphene.Field(PlacementType, placementId=graphene.Int(required=True))
+
+
+    @login_required
+    def resolve_allPlacements(self, info):
+        # Fetch all placements where rowstatus=True
+        return Placement.objects.filter(rowstatus=True)
+    
+    @login_required
+    def resolve_placementById(self, info, placementId):
+        # Fetch a single placement by placementId where rowstatus=True
+        try:
+            return Placement.objects.get(pk=placementId, rowstatus=True)
+        except Placement.DoesNotExist:
+            return None
+        
+
+    @login_required
+    def resolve_all_batches(self, info):
+        return Batch.objects.filter(rowstatus=True)
+
+    @login_required
+    def resolve_batch_by_id(self, info, batchid):
+        try:
+            return Batch.objects.get(batchid=batchid, rowstatus=True)
+        except Batch.DoesNotExist:
+            return None
+
 
     @login_required                       
     def resolve_all_warehouses(self, info, **kwargs):
@@ -498,11 +708,6 @@ class Query(graphene.ObjectType):
         return product_responses
 
 
-    def resolve_product(self, info, id):
-        return Product.objects.get(pk=id)
-
-    # def resolve_all_products(self, info):
-    #     return Product.objects.all()
 
     @login_required                       
     def resolve_category(self, info, id):
@@ -587,5 +792,10 @@ class Mutation(graphene.ObjectType):
     create_batch = CreateBatch.Field()
     update_batch = UpdateBatch.Field()
     delete_batch = DeleteBatch.Field()
+
+    create_placement = CreatePlacement.Field()
+    update_placement = UpdatePlacement.Field()
+    delete_placement = DeletePlacement.Field()
+
 
 idscore_schema = graphene.Schema(query=Query, mutation=Mutation)
