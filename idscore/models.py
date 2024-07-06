@@ -19,7 +19,8 @@ class Product(models.Model):
     brand = models.CharField(max_length=100)
     weight = models.CharField(max_length=50)
     dimensions = models.CharField(max_length=100)
-    images = models.JSONField() 
+    images = models.JSONField()
+    # image = models.BinaryField(null=True, blank=True) 
     createduser = models.CharField(max_length=100)
     modifieduser = models.CharField(max_length=100)
     createdtime = models.DateTimeField(auto_now_add=True)
@@ -81,7 +82,7 @@ class Location(models.Model):
 
 class Batch(models.Model):
     batchid = models.AutoField(primary_key=True)
-    productid = models.ForeignKey('Product', on_delete=models.CASCADE)
+    productid = models.ForeignKey(Product, on_delete=models.CASCADE)
     manufacturedate = models.DateField()
     expirydate = models.DateField()
     quantity = models.CharField()
@@ -93,3 +94,20 @@ class Batch(models.Model):
 
     def __str__(self):
         return f'Batch {self.batchid} for {self.productid}'
+    
+
+class Placement(models.Model):
+    placementId = models.AutoField(primary_key=True)
+    productid = models.ForeignKey(Product, on_delete=models.CASCADE)
+    warehouseid = models.ForeignKey(Warehouse, on_delete=models.CASCADE)
+    aile = models.CharField(max_length=50)  
+    bin = models.CharField(max_length=50)   
+    batchid = models.ForeignKey(Batch, on_delete=models.CASCADE)
+    createduser = models.CharField(max_length=100)
+    modifieduser = models.CharField(max_length=100)
+    createdtime = models.DateTimeField(auto_now_add=True) 
+    modifiedtime = models.DateTimeField(auto_now=True)
+    rowstatus = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f'Placement {self.placementId} - Product: {self.productid}, Warehouse: {self.warehouseid}'
