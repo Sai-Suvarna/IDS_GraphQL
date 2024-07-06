@@ -4,6 +4,9 @@ from graphene_django import DjangoObjectType
 from .models import Product, Inventory, Warehouse, Location, Category, Batch, Placement
 from graphql_jwt.decorators import login_required
 
+
+# Define GraphQL Types for Django Models
+
 class ProductType(DjangoObjectType):
     class Meta:
         model = Product
@@ -20,6 +23,7 @@ class WarehouseType(DjangoObjectType):
     class Meta:
         model = Warehouse
 
+    # Resolve the relationship with Location
     location = graphene.Field(LocationType)
 
     def resolve_location(self, info):
@@ -36,6 +40,8 @@ class BatchType(DjangoObjectType):
 class PlacementType(DjangoObjectType):
     class Meta:
         model = Placement
+
+# Mutations for Creating, Updating, and Deleting Categories
 
 class CreateCategory(graphene.Mutation):
     class Arguments:
@@ -72,11 +78,13 @@ class UpdateCategory(graphene.Mutation):
     @login_required
     def mutate(self, info, category_id, name=None, image=None, rowstatus=None):
         try:
+            # Retrieve the existing Category object
             category = Category.objects.get(pk=category_id)
         except Category.DoesNotExist:
             raise Exception(f"Category with id {category_id} does not exist.")
 
         try:
+            # Update the Category fields if provided
             if name is not None:
                 category.name = name
             if image is not None:
@@ -101,6 +109,7 @@ class DeleteCategory(graphene.Mutation):
     @login_required
     def mutate(self, info, category_id):
         try:
+            # Soft delete the Category by setting rowstatus to False
             category = Category.objects.get(pk=category_id)
             category.rowstatus = False  # Soft delete by setting rowstatus to False
             category.save()
@@ -110,13 +119,14 @@ class DeleteCategory(graphene.Mutation):
         except Exception as e:
             return DeleteCategory(status_code=400, message=str(e))
 
-
+# Input Object Type for Inventory details
 class InventoryInputType(graphene.InputObjectType):
     warehouseid = graphene.Int(required=True)
     minstocklevel = graphene.String(required=True)
     maxstocklevel = graphene.String(required=True)
     quantityavailable = graphene.String()
 
+# Mutation for Creating a Product and its related Inventories
 class CreateProduct(graphene.Mutation):
     class Arguments:
         productcode = graphene.String(required=True)
@@ -168,7 +178,7 @@ class CreateProduct(graphene.Mutation):
             )
             product.save()
 
-            # Create Inventory instances
+            # Create Inventory instances related to the Product
             for inventory_detail in inventory_details:
                 warehouse = Warehouse.objects.get(pk=inventory_detail['warehouseid'])
                 inventory = Inventory(
@@ -187,6 +197,7 @@ class CreateProduct(graphene.Mutation):
         except Exception as e:
             return CreateProduct(status_code=400, message=str(e))
 
+# Mutation for Updating a Product and its related Inventories
 
 class UpdateProduct(graphene.Mutation):
     class Arguments:
@@ -247,7 +258,7 @@ class UpdateProduct(graphene.Mutation):
 
             product.save()
 
-            # Update Inventory instances
+            # Update related Inventory instances
             if inventory_details:
                 for inventory_detail in inventory_details:
                     warehouse = Warehouse.objects.get(pk=inventory_detail['warehouseid'])
@@ -270,6 +281,7 @@ class UpdateProduct(graphene.Mutation):
         except Exception as e:
             return UpdateProduct(status_code=400, message=str(e))
 
+# Mutation for Deleting a Product and its related Inventories
 
 class DeleteProduct(graphene.Mutation):
     class Arguments:
@@ -282,11 +294,12 @@ class DeleteProduct(graphene.Mutation):
     @login_required
     def mutate(self, info, product_id):
         try:
+            # Soft delete the Product by setting rowstatus to False
             product = Product.objects.get(pk=product_id)
-            product.rowstatus = False  # Soft delete by setting rowstatus to False
+            product.rowstatus = False  
             product.save()
 
-            # Update corresponding inventory rows
+            # Soft delete related Inventory instances
             inventories = Inventory.objects.filter(productid=product)
             for inventory in inventories:
                 inventory.rowstatus = False
@@ -297,6 +310,9 @@ class DeleteProduct(graphene.Mutation):
             raise Exception(f"Product with id {product_id} does not exist.")
         except Exception as e:
             return DeleteProduct(status_code=400, message=str(e))
+
+
+# Mutation for Creating Warehouses
 
 class CreateWarehouse(graphene.Mutation):
     class Arguments:
@@ -325,6 +341,9 @@ class CreateWarehouse(graphene.Mutation):
         except Exception as e:
             return CreateWarehouse(status_code=400, message=str(e))
 
+
+# Mutation for Creating Locations
+
 class CreateLocation(graphene.Mutation):
     class Arguments:
         locationname = graphene.String(required=True)
@@ -348,6 +367,9 @@ class CreateLocation(graphene.Mutation):
             return CreateLocation(location=location, status_code=200, message="Location created successfully.")
         except Exception as e:
             return CreateLocation(status_code=400, message=str(e))
+
+
+# Mutations for Creating, Updating, and Deleting Batches
 
 class CreateBatch(graphene.Mutation):
     batch = graphene.Field(BatchType)
@@ -433,6 +455,8 @@ class DeleteBatch(graphene.Mutation):
         except Exception as e:
             return DeleteBatch(status_code=400, message=str(e))
 
+
+# Mutations for Creating, Updating, and Deleting Placements
 
 class CreatePlacement(graphene.Mutation):
     class Arguments:
@@ -555,15 +579,27 @@ class DeletePlacement(graphene.Mutation):
 
 
 
-
-
-
+class BatchDetailType(graphene.ObjectType):
+    batchid = graphene.Int()
+    manufacturedate = graphene.Date()
+    expirydate = graphene.Date()
+    quantity = graphene.String()
+    createduser = graphene.String()
+    modifieduser = graphene.String()
 
 class InventoryDetailType(graphene.ObjectType):
     warehouseid = graphene.Int()
     minstocklevel = graphene.String()
     maxstocklevel = graphene.String()
     quantityavailable = graphene.String()
+
+
+class PlacementDetailType(graphene.ObjectType):
+    placementId = graphene.Int()
+    warehouseid = graphene.Int()
+    aile = graphene.String()
+    bin = graphene.String()
+    batchid = graphene.Int()
 
 class ProductResponseType(graphene.ObjectType):
     productid = graphene.Int()
@@ -584,7 +620,11 @@ class ProductResponseType(graphene.ObjectType):
     modifiedtime = graphene.DateTime()
     rowstatus = graphene.Boolean()
     inventoryDetails = graphene.List(InventoryDetailType)
+    placementDetails = graphene.List(PlacementDetailType)  # Add this field
+    batchDetails = graphene.List(BatchDetailType)  # Add this field
 
+
+# Root Query class to define all queries
 
 class Query(graphene.ObjectType):
 
@@ -612,25 +652,25 @@ class Query(graphene.ObjectType):
     allPlacements = graphene.List(PlacementType)
     placementById = graphene.Field(PlacementType, placementId=graphene.Int(required=True))
 
-
+    # Fetch all placements where rowstatus=True
     @login_required
     def resolve_allPlacements(self, info):
-        # Fetch all placements where rowstatus=True
         return Placement.objects.filter(rowstatus=True)
-    
+            
+    # Fetch a single placement by placementId where rowstatus=True
     @login_required
     def resolve_placementById(self, info, placementId):
-        # Fetch a single placement by placementId where rowstatus=True
         try:
             return Placement.objects.get(pk=placementId, rowstatus=True)
         except Placement.DoesNotExist:
             return None
         
-
+    # Fetch all batchs where rowstatus=True
     @login_required
     def resolve_all_batches(self, info):
         return Batch.objects.filter(rowstatus=True)
 
+    # Fetch a single batch by batchid where rowstatus=True
     @login_required
     def resolve_batch_by_id(self, info, batchid):
         try:
@@ -638,23 +678,27 @@ class Query(graphene.ObjectType):
         except Batch.DoesNotExist:
             return None
 
-
+    # Fetch all warehouses 
     @login_required                       
     def resolve_all_warehouses(self, info, **kwargs):
         return Warehouse.objects.all()
 
+    # Fetch all locations
     @login_required                       
     def resolve_all_locations(self, info, **kwargs):
         return Location.objects.all()
 
+    # Fetch a single warehouse by id 
     @login_required                       
     def resolve_warehouse(self, info, id, **kwargs):
         return Warehouse.objects.get(pk=id)
 
+    # Fetch a single location by id 
     @login_required                       
     def resolve_location(self, info, id, **kwargs):
         return Location.objects.get(pk=id)
 
+    # Fetch all products and related inventories where rowstatus=True
     @login_required                       
     def resolve_all_products(self, info):
         products = Product.objects.filter(rowstatus=True)
@@ -707,20 +751,22 @@ class Query(graphene.ObjectType):
 
         return product_responses
 
-
-
+    # Fetch a single category by id where rowstatus=True
     @login_required                       
     def resolve_category(self, info, id):
         return Category.objects.get(pk=id, rowstatus=True)
     
+    # Fetch all categories where rowstatus=True
     @login_required                       
     def resolve_all_categories(self, info):
         return Category.objects.filter(rowstatus=True)
-    
+        
+    # Fetch a single inventory by id 
     @login_required                       
     def resolve_inventory(self, info, id):
         return Inventory.objects.get(pk=id)
     
+    # Fetch all inventories where rowstatus=True
     @login_required                       
     def resolve_all_inventories(self, info):
         return Inventory.objects.all()
@@ -729,12 +775,11 @@ class Query(graphene.ObjectType):
     def resolve_inventory_by_product(self, info, productid):
         return Inventory.objects.filter(productid=productid)
    
-    @login_required
+    @login_required                       
     def resolve_product_response(self, info, productid=None):
         try:
             if productid is not None:
-                product = Product.objects.get(pk=productid,rowstatus=True)
-            
+                product = Product.objects.get(pk=productid, rowstatus=True)
             else:
                 raise Exception("Either productid or productcode must be provided")
 
@@ -747,14 +792,41 @@ class Query(graphene.ObjectType):
                     'minstocklevel': inventory.minstocklevel,
                     'maxstocklevel': inventory.maxstocklevel,
                     'quantityavailable': inventory.quantityavailable
-                }
+            }
                 inventory_details.append(inventory_detail)
 
-
-            # Fetch category name using the category ID
+        # Fetch category name using the category ID
             category = Category.objects.get(pk=product.productcategory)
             category_name = category.name
 
+        # Fetch placements associated with the product
+            placements = Placement.objects.filter(productid=product, rowstatus=True)
+
+            placement_details = []
+            for placement in placements:
+                placement_detail = {
+                    'placementId': placement.placementId,
+                    'warehouseid': placement.warehouseid.pk,
+                    'aile': placement.aile,
+                    'bin': placement.bin,
+                    'batchid': placement.batchid.pk
+            }
+                placement_details.append(placement_detail)
+
+        # Fetch batches associated with the product
+            batches = Batch.objects.filter(productid=product, rowstatus=True)
+
+            batch_details = []
+            for batch in batches:
+                batch_detail = {
+                    'batchid': batch.batchid,
+                    'manufacturedate': batch.manufacturedate,
+                    'expirydate': batch.expirydate,
+                    'quantity': batch.quantity,
+                    'createduser': batch.createduser,
+                    'modifieduser': batch.modifieduser
+            }
+                batch_details.append(batch_detail)
 
             return ProductResponseType(
                 productcode=product.productcode,
@@ -763,7 +835,6 @@ class Query(graphene.ObjectType):
                 productdescription=product.productdescription,
                 productcategory=str(product.productcategory),
                 category_name=category_name,
-
                 reorderpoint=product.reorderpoint,
                 brand=product.brand,
                 weight=product.weight,
@@ -771,11 +842,15 @@ class Query(graphene.ObjectType):
                 images=json.loads(product.images),
                 createduser=product.createduser,
                 modifieduser=product.modifieduser,
-                inventoryDetails=inventory_details
-            )
+                inventoryDetails=inventory_details,
+                placementDetails=placement_details,  # Include placement details
+                batchDetails=batch_details  # Include batch details
+        )
         except Product.DoesNotExist:
             return None
 
+
+# Root Mutation class to define all mutations
 
 class Mutation(graphene.ObjectType):
     update_product = UpdateProduct.Field()
@@ -798,4 +873,5 @@ class Mutation(graphene.ObjectType):
     delete_placement = DeletePlacement.Field()
 
 
+# Define the GraphQL schema with defined Query and Mutation
 idscore_schema = graphene.Schema(query=Query, mutation=Mutation)
