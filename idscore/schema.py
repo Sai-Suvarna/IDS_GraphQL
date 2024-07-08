@@ -596,10 +596,11 @@ class InventoryDetailType(graphene.ObjectType):
 
 class PlacementDetailType(graphene.ObjectType):
     placementId = graphene.Int()
-    warehouseid = graphene.Int()
+    # warehouseid = graphene.Int()
+    warehousename = graphene.String()
     aile = graphene.String()
     bin = graphene.String()
-    batchid = graphene.Int()
+    # batchid = graphene.Int()
 
 class ProductResponseType(graphene.ObjectType):
     productid = graphene.Int()
@@ -699,7 +700,7 @@ class Query(graphene.ObjectType):
         return Location.objects.get(pk=id)
 
     # Fetch all products and related inventories where rowstatus=True
-    @login_required                       
+    # @login_required                   
     def resolve_all_products(self, info):
         products = Product.objects.filter(rowstatus=True)
         product_responses = []
@@ -714,17 +715,46 @@ class Query(graphene.ObjectType):
                     'minstocklevel': inventory.minstocklevel,
                     'maxstocklevel': inventory.maxstocklevel,
                     'quantityavailable': inventory.quantityavailable
-                }
+            }
                 inventory_details.append(inventory_detail)
 
             images_list = product.images
             if isinstance(images_list, str):
                 images_list = json.loads(images_list)
 
-            # Fetch category name using the category ID
+        # Fetch category name using the category ID
             category = Category.objects.get(pk=product.productcategory)
             category_name = category.name
 
+        # Fetch placements associated with the product
+            placements = Placement.objects.filter(productid=product, rowstatus=True)
+
+            placement_details = []
+            for placement in placements:
+                placement_detail = {
+                    'placementId': placement.placementId,
+                    # 'warehouseid': placement.warehouseid.pk,
+                    'warehousename': placement.warehouseid.warehousename,  
+                    'aile': placement.aile,
+                    'bin': placement.bin,
+                    # 'batchid': placement.batchid.pk
+            }
+                placement_details.append(placement_detail)
+
+        # Fetch batches associated with the product
+            batches = Batch.objects.filter(productid=product, rowstatus=True)
+
+            batch_details = []
+            for batch in batches:
+                batch_detail = {
+                    'batchid': batch.batchid,
+                    'manufacturedate': batch.manufacturedate,
+                    'expirydate': batch.expirydate,
+                    'quantity': batch.quantity,
+                    'createduser': batch.createduser,
+                    'modifieduser': batch.modifieduser
+            }
+                batch_details.append(batch_detail)
 
             product_response = ProductResponseType(
                 productid=product.pk,
@@ -734,7 +764,6 @@ class Query(graphene.ObjectType):
                 productdescription=product.productdescription,
                 productcategory=str(product.productcategory),
                 category_name=category_name,
-
                 reorderpoint=product.reorderpoint,
                 brand=product.brand,
                 weight=product.weight,
@@ -745,11 +774,64 @@ class Query(graphene.ObjectType):
                 createdtime=product.createdtime,
                 modifiedtime=product.modifiedtime,
                 rowstatus=product.rowstatus,
-                inventoryDetails=inventory_details
-            )
+                inventoryDetails=inventory_details,
+                placementDetails=placement_details,  # Include placement details
+                batchDetails=batch_details  # Include batch details
+        )
             product_responses.append(product_response)
 
         return product_responses
+    
+    # def resolve_all_products(self, info):
+    #     products = Product.objects.filter(rowstatus=True)
+    #     product_responses = []
+
+    #     for product in products:
+    #         inventories = Inventory.objects.filter(productid=product)
+
+    #         inventory_details = []
+    #         for inventory in inventories:
+    #             inventory_detail = {
+    #                 'warehouseid': inventory.warehouseid.pk,
+    #                 'minstocklevel': inventory.minstocklevel,
+    #                 'maxstocklevel': inventory.maxstocklevel,
+    #                 'quantityavailable': inventory.quantityavailable
+    #             }
+    #             inventory_details.append(inventory_detail)
+
+    #         images_list = product.images
+    #         if isinstance(images_list, str):
+    #             images_list = json.loads(images_list)
+
+    #         # Fetch category name using the category ID
+    #         category = Category.objects.get(pk=product.productcategory)
+    #         category_name = category.name
+
+
+    #         product_response = ProductResponseType(
+    #             productid=product.pk,
+    #             productcode=product.productcode,
+    #             qrcode=product.qrcode,
+    #             productname=product.productname,
+    #             productdescription=product.productdescription,
+    #             productcategory=str(product.productcategory),
+    #             category_name=category_name,
+
+    #             reorderpoint=product.reorderpoint,
+    #             brand=product.brand,
+    #             weight=product.weight,
+    #             dimensions=product.dimensions,
+    #             images=images_list,
+    #             createduser=product.createduser,
+    #             modifieduser=product.modifieduser,
+    #             createdtime=product.createdtime,
+    #             modifiedtime=product.modifiedtime,
+    #             rowstatus=product.rowstatus,
+    #             inventoryDetails=inventory_details
+    #         )
+    #         product_responses.append(product_response)
+
+    #     return product_responses
 
     # Fetch a single category by id where rowstatus=True
     @login_required                       
@@ -806,10 +888,11 @@ class Query(graphene.ObjectType):
             for placement in placements:
                 placement_detail = {
                     'placementId': placement.placementId,
-                    'warehouseid': placement.warehouseid.pk,
+                    # 'warehouseid': placement.warehouseid.pk,
+                    'warehousename': placement.warehouseid.warehousename,  
                     'aile': placement.aile,
                     'bin': placement.bin,
-                    'batchid': placement.batchid.pk
+                    # 'batchid': placement.batchid.pk
             }
                 placement_details.append(placement_detail)
 
