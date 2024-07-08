@@ -125,6 +125,8 @@ class InventoryInputType(graphene.InputObjectType):
     minstocklevel = graphene.String(required=True)
     maxstocklevel = graphene.String(required=True)
     quantityavailable = graphene.String()
+    invreorderpoint = graphene.Int()  
+
 
 # Mutation for Creating a Product and its related Inventories
 class CreateProduct(graphene.Mutation):
@@ -134,10 +136,10 @@ class CreateProduct(graphene.Mutation):
         productname = graphene.String(required=True)
         productdescription = graphene.String(required=True)
         productcategory = graphene.String(required=True)
-        reorderpoint = graphene.Int(required=True)
-        brand = graphene.String(required=True)
-        weight = graphene.String(required=True)
-        dimensions = graphene.String(required=True)
+        reorderpoint = graphene.Int()
+        brand = graphene.String()
+        weight = graphene.String()
+        dimensions = graphene.String()
         images = graphene.List(graphene.String)
         createduser = graphene.String(required=True)
         modifieduser = graphene.String(required=True)
@@ -186,7 +188,7 @@ class CreateProduct(graphene.Mutation):
                     quantityavailable=inventory_detail['quantityavailable'],
                     minstocklevel=inventory_detail['minstocklevel'],
                     maxstocklevel=inventory_detail['maxstocklevel'],
-                    reorderpoint=reorderpoint,
+                    invreorderpoint=inventory_detail['invreorderpoint'],
                     warehouseid=warehouse,
                     createduser=createduser,
                     modifieduser=modifieduser
@@ -269,7 +271,7 @@ class UpdateProduct(graphene.Mutation):
                             'quantityavailable': inventory_detail['quantityavailable'],
                             'minstocklevel': inventory_detail['minstocklevel'],
                             'maxstocklevel': inventory_detail['maxstocklevel'],
-                            'reorderpoint': reorderpoint if reorderpoint is not None else product.reorderpoint,
+                            'invreorderpoint': inventory_detail['invreorderpoint'],
                             'createduser': createduser if createduser else product.createduser,
                             'modifieduser': modifieduser if modifieduser else product.modifieduser
                         }
@@ -592,6 +594,8 @@ class InventoryDetailType(graphene.ObjectType):
     minstocklevel = graphene.String()
     maxstocklevel = graphene.String()
     quantityavailable = graphene.String()
+    invreorderpoint = graphene.Int()  
+
 
 
 class PlacementDetailType(graphene.ObjectType):
@@ -700,7 +704,7 @@ class Query(graphene.ObjectType):
         return Location.objects.get(pk=id)
 
     # Fetch all products and related inventories where rowstatus=True
-    # @login_required                   
+    @login_required                   
     def resolve_all_products(self, info):
         products = Product.objects.filter(rowstatus=True)
         product_responses = []
@@ -714,7 +718,9 @@ class Query(graphene.ObjectType):
                     'warehouseid': inventory.warehouseid.pk,
                     'minstocklevel': inventory.minstocklevel,
                     'maxstocklevel': inventory.maxstocklevel,
-                    'quantityavailable': inventory.quantityavailable
+                    'quantityavailable': inventory.quantityavailable,
+                    'invreorderpoint': inventory.invreorderpoint,
+
             }
                 inventory_details.append(inventory_detail)
 
@@ -782,56 +788,7 @@ class Query(graphene.ObjectType):
 
         return product_responses
     
-    # def resolve_all_products(self, info):
-    #     products = Product.objects.filter(rowstatus=True)
-    #     product_responses = []
-
-    #     for product in products:
-    #         inventories = Inventory.objects.filter(productid=product)
-
-    #         inventory_details = []
-    #         for inventory in inventories:
-    #             inventory_detail = {
-    #                 'warehouseid': inventory.warehouseid.pk,
-    #                 'minstocklevel': inventory.minstocklevel,
-    #                 'maxstocklevel': inventory.maxstocklevel,
-    #                 'quantityavailable': inventory.quantityavailable
-    #             }
-    #             inventory_details.append(inventory_detail)
-
-    #         images_list = product.images
-    #         if isinstance(images_list, str):
-    #             images_list = json.loads(images_list)
-
-    #         # Fetch category name using the category ID
-    #         category = Category.objects.get(pk=product.productcategory)
-    #         category_name = category.name
-
-
-    #         product_response = ProductResponseType(
-    #             productid=product.pk,
-    #             productcode=product.productcode,
-    #             qrcode=product.qrcode,
-    #             productname=product.productname,
-    #             productdescription=product.productdescription,
-    #             productcategory=str(product.productcategory),
-    #             category_name=category_name,
-
-    #             reorderpoint=product.reorderpoint,
-    #             brand=product.brand,
-    #             weight=product.weight,
-    #             dimensions=product.dimensions,
-    #             images=images_list,
-    #             createduser=product.createduser,
-    #             modifieduser=product.modifieduser,
-    #             createdtime=product.createdtime,
-    #             modifiedtime=product.modifiedtime,
-    #             rowstatus=product.rowstatus,
-    #             inventoryDetails=inventory_details
-    #         )
-    #         product_responses.append(product_response)
-
-    #     return product_responses
+    
 
     # Fetch a single category by id where rowstatus=True
     @login_required                       
@@ -873,7 +830,9 @@ class Query(graphene.ObjectType):
                     'warehouseid': inventory.warehouseid.pk,
                     'minstocklevel': inventory.minstocklevel,
                     'maxstocklevel': inventory.maxstocklevel,
-                    'quantityavailable': inventory.quantityavailable
+                    'quantityavailable': inventory.quantityavailable,
+                    'invreorderpoint' : inventory.invreorderpoint,
+
             }
                 inventory_details.append(inventory_detail)
 
