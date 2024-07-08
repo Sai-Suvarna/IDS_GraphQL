@@ -38,7 +38,7 @@ class Inventory(models.Model):
     quantityavailable = models.CharField(max_length=50)
     minstocklevel = models.CharField(max_length=50)
     maxstocklevel = models.CharField(max_length=50)
-    reorderpoint = models.IntegerField()
+    invreorderpoint = models.IntegerField()  
     warehouseid = models.ForeignKey('Warehouse', on_delete=models.CASCADE)
     createduser = models.CharField(max_length=100)
     modifieduser = models.CharField(max_length=100)
