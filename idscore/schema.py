@@ -22,7 +22,6 @@ class LocationType(DjangoObjectType):
 class WarehouseType(DjangoObjectType):
     class Meta:
         model = Warehouse
-        fields = ("warehouseid", "warehousename")  # Include all fields needed
 
 
     # Resolve the relationship with Location
@@ -381,7 +380,6 @@ class CreateLocation(graphene.Mutation):
 
 
 # Mutations for Creating, Updating, and Deleting Batches
-
 
 class CreateBatch(graphene.Mutation):
     batches = graphene.List(BatchType)
