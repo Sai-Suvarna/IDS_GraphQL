@@ -381,8 +381,8 @@ class CreateBatch(graphene.Mutation):
     class Arguments:
         productid = graphene.Int(required=True)
         manufacturedate = graphene.Date(required=True)
-        expirydate = graphene.Date(required=True)
-        quantity = graphene.String(required=True)
+        expirydate = graphene.Date()
+        quantity = graphene.String()
         createduser = graphene.String(required=True)
         modifieduser = graphene.String(required=True)
         rowstatus = graphene.Boolean()
