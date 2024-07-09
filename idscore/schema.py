@@ -372,8 +372,41 @@ class CreateLocation(graphene.Mutation):
 
 # Mutations for Creating, Updating, and Deleting Batches
 
+# class CreateBatch(graphene.Mutation):
+#     batch = graphene.Field(BatchType)
+#     status_code = graphene.Int()
+#     message = graphene.String()
+
+#     class Arguments:
+#         productid = graphene.Int(required=True)
+#         manufacturedate = graphene.Date()
+#         expirydate = graphene.Date()
+#         quantity = graphene.String(required=True)
+#         createduser = graphene.String(required=True)
+#         modifieduser = graphene.String(required=True)
+#         rowstatus = graphene.Boolean()
+
+#     @login_required
+#     def mutate(self, info, productid, quantity, createduser, modifieduser, manufacturedate=None, expirydate=None, rowstatus=True):
+#         try:
+#             product = Product.objects.get(productid=productid)
+#             batch = Batch(
+#                 productid=product,
+#                 manufacturedate=manufacturedate,
+#                 expirydate=expirydate,
+#                 quantity=quantity,
+#                 createduser=createduser,
+#                 modifieduser=modifieduser,
+#                 rowstatus=rowstatus
+#             )
+#             batch.save()
+#             return CreateBatch(batch=batch, status_code=200, message="Batch created successfully.")
+#         except Exception as e:
+#             return CreateBatch(status_code=400, message=str(e))
+
+
 class CreateBatch(graphene.Mutation):
-    batch = graphene.Field(BatchType)
+    batches = graphene.List(BatchType)
     status_code = graphene.Int()
     message = graphene.String()
 
@@ -386,7 +419,7 @@ class CreateBatch(graphene.Mutation):
         modifieduser = graphene.String(required=True)
         rowstatus = graphene.Boolean()
 
-    @login_required
+    # @login_required
     def mutate(self, info, productid, quantity, createduser, modifieduser, manufacturedate=None, expirydate=None, rowstatus=True):
         try:
             product = Product.objects.get(productid=productid)
@@ -400,9 +433,14 @@ class CreateBatch(graphene.Mutation):
                 rowstatus=rowstatus
             )
             batch.save()
-            return CreateBatch(batch=batch, status_code=200, message="Batch created successfully.")
+
+            # Retrieve all batches after creation
+            batches = Batch.objects.all()
+
+            return CreateBatch(batches=batches, status_code=200, message="Batch created successfully.")
         except Exception as e:
             return CreateBatch(status_code=400, message=str(e))
+
 
 
 class UpdateBatch(graphene.Mutation):
@@ -419,7 +457,7 @@ class UpdateBatch(graphene.Mutation):
         createduser = graphene.String(required=False)
         modifieduser = graphene.String(required=False)
         rowstatus = graphene.Boolean(required=False)
-        
+
     @login_required
     def mutate(self, info, batchid, **kwargs):
         try:
