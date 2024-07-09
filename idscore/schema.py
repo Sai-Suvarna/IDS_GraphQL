@@ -419,7 +419,7 @@ class CreateBatch(graphene.Mutation):
         modifieduser = graphene.String(required=True)
         rowstatus = graphene.Boolean()
 
-    @login_required
+    # @login_required
     def mutate(self, info, productid, quantity, createduser, modifieduser, manufacturedate=None, expirydate=None, rowstatus=True):
         try:
             product = Product.objects.get(productid=productid)
@@ -435,7 +435,7 @@ class CreateBatch(graphene.Mutation):
             batch.save()
 
             # Retrieve all batches after creation
-            batches = Batch.objects.all()
+            batches = Batch.objects.filter(productid=product)
 
             return CreateBatch(batches=batches, status_code=200, message="Batch created successfully.")
         except Exception as e:
@@ -471,7 +471,7 @@ class UpdateBatch(graphene.Mutation):
             batch.save()
 
             # Retrieve all batches after update
-            batches = Batch.objects.all()
+            batches = Batch.objects.filter(productid=product)
 
             return UpdateBatch(batches=batches, status_code=200, message="Batch updated successfully.")
         except Exception as e:
