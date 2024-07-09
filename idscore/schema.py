@@ -132,7 +132,7 @@ class InventoryInputType(graphene.InputObjectType):
 class CreateProduct(graphene.Mutation):
     class Arguments:
         productcode = graphene.String(required=True)
-        qrcode = graphene.String(required=True)
+        qrcode = graphene.String()
         productname = graphene.String(required=True)
         productdescription = graphene.String(required=True)
         productcategory = graphene.String(required=True)
@@ -141,8 +141,8 @@ class CreateProduct(graphene.Mutation):
         weight = graphene.String()
         dimensions = graphene.String()
         images = graphene.List(graphene.String)
-        createduser = graphene.String(required=True)
-        modifieduser = graphene.String(required=True)
+        createduser = graphene.String()
+        modifieduser = graphene.String()
         inventory_details = graphene.List(InventoryInputType, required=True)
 
     status_code = graphene.Int()
@@ -221,7 +221,6 @@ class UpdateProduct(graphene.Mutation):
     status_code = graphene.Int()
     message = graphene.String()
 
-    @login_required
     def mutate(self, info, product_id, productcode=None, qrcode=None, productname=None, productdescription=None, productcategory=None, reorderpoint=None, brand=None, weight=None, dimensions=None, images=None, createduser=None, modifieduser=None, inventory_details=None):
         try:
             # Fetch the existing Product instance
@@ -380,15 +379,15 @@ class CreateBatch(graphene.Mutation):
 
     class Arguments:
         productid = graphene.Int(required=True)
-        manufacturedate = graphene.Date(required=True)
+        manufacturedate = graphene.Date()
         expirydate = graphene.Date()
-        quantity = graphene.String()
+        quantity = graphene.String(required=True)
         createduser = graphene.String(required=True)
         modifieduser = graphene.String(required=True)
         rowstatus = graphene.Boolean()
 
     @login_required
-    def mutate(self, info, productid, manufacturedate, expirydate, quantity, createduser, modifieduser, rowstatus=True):
+    def mutate(self, info, productid, quantity, createduser, modifieduser, manufacturedate=None, expirydate=None, rowstatus=True):
         try:
             product = Product.objects.get(productid=productid)
             batch = Batch(
@@ -407,7 +406,7 @@ class CreateBatch(graphene.Mutation):
 
 
 class UpdateBatch(graphene.Mutation):
-    batch = graphene.Field(BatchType)
+    batches = graphene.List(BatchType)
     status_code = graphene.Int()
     message = graphene.String()
 
@@ -420,8 +419,7 @@ class UpdateBatch(graphene.Mutation):
         createduser = graphene.String(required=False)
         modifieduser = graphene.String(required=False)
         rowstatus = graphene.Boolean(required=False)
-
-
+        
     @login_required
     def mutate(self, info, batchid, **kwargs):
         try:
@@ -433,9 +431,15 @@ class UpdateBatch(graphene.Mutation):
                 if key != 'productid':
                     setattr(batch, key, value)
             batch.save()
-            return UpdateBatch(batch=batch, status_code=200, message="Batch updated successfully.")
+
+            # Retrieve all batches after update
+            batches = Batch.objects.all()
+
+            return UpdateBatch(batches=batches, status_code=200, message="Batch updated successfully.")
         except Exception as e:
             return UpdateBatch(status_code=400, message=str(e))
+
+
 
 
 class DeleteBatch(graphene.Mutation):
@@ -704,7 +708,7 @@ class Query(graphene.ObjectType):
         return Location.objects.get(pk=id)
 
     # Fetch all products and related inventories where rowstatus=True
-    @login_required                   
+    # @login_required                   
     def resolve_all_products(self, info):
         products = Product.objects.filter(rowstatus=True)
         product_responses = []
@@ -788,8 +792,6 @@ class Query(graphene.ObjectType):
 
         return product_responses
     
-    
-
     # Fetch a single category by id where rowstatus=True
     @login_required                       
     def resolve_category(self, info, id):
