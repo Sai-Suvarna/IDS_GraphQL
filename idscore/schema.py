@@ -419,7 +419,7 @@ class CreateBatch(graphene.Mutation):
         modifieduser = graphene.String(required=True)
         rowstatus = graphene.Boolean()
 
-    # @login_required
+    @login_required
     def mutate(self, info, productid, quantity, createduser, modifieduser, manufacturedate=None, expirydate=None, rowstatus=True):
         try:
             product = Product.objects.get(productid=productid)
