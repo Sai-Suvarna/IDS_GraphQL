@@ -151,6 +151,8 @@ class CreateInventory(graphene.Mutation):
     status_code = graphene.Int()
     message = graphene.String()
 
+    
+    @login_required
     def mutate(self, info, input):
         try:
             product = Product.objects.get(pk=input.productid)
