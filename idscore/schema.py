@@ -12,7 +12,10 @@ class ProductType(DjangoObjectType):
         model = Product
 
 class InventoryType(DjangoObjectType):
-    invreorderpoint = graphene.Int()  
+    invreorderpoint = graphene.Int()  # Make it nullable
+    warehousename = graphene.String()
+
+
     warehouseid = graphene.Int()   
 
     class Meta:
@@ -20,6 +23,11 @@ class InventoryType(DjangoObjectType):
     
     def resolve_warehouseid(self, info):
         return self.warehouseid.pk  # Return the primary key of the warehouse
+    
+    def resolve_warehousename(self, info):
+        # Resolve warehousename from the related Warehouse object
+        return self.warehouseid.warehousename if self.warehouseid else None
+
 
 class LocationType(DjangoObjectType):
     class Meta:
@@ -664,7 +672,6 @@ class CreateBatch(graphene.Mutation):
             return CreateBatch(status_code=400, message=str(e))
 
 
-
 class UpdateBatch(graphene.Mutation):
     batches = graphene.List(BatchType)
     status_code = graphene.Int()
@@ -703,7 +710,6 @@ class UpdateBatch(graphene.Mutation):
             return UpdateBatch(status_code=404, message="Product not found.")
         except Exception as e:
             return UpdateBatch(status_code=400, message=str(e))
-
 
 
 
@@ -908,7 +914,7 @@ class ProductResponseType(graphene.ObjectType):
 
 class Query(graphene.ObjectType):
 
-    product = graphene.Field(ProductType, id=graphene.Int(required=True))
+    # product = graphene.Field(ProductType, id=graphene.Int(required=True))
     all_products = graphene.List(ProductResponseType)
     product_response = graphene.Field(ProductResponseType, productid=graphene.Int())
 
@@ -979,7 +985,7 @@ class Query(graphene.ObjectType):
         return Location.objects.get(pk=id)
 
     # Fetch all products and related inventories where rowstatus=True
-    # @login_required                   
+    @login_required                   
     def resolve_all_products(self, info):
         products = Product.objects.filter(rowstatus=True)
         product_responses = []
