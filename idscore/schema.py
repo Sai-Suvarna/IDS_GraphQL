@@ -142,11 +142,11 @@ class CreateInventory(graphene.Mutation):
         quantityavailable = graphene.String(required=True)
         minstocklevel = graphene.String(required=True)
         maxstocklevel = graphene.String(required=True)
-        invreorderpoint = graphene.Int(required=False)  # Optional argument
+        invreorderpoint = graphene.Int()  # Optional argument
         warehouseid = graphene.ID(required=True)
         createduser = graphene.String(required=True)
         modifieduser = graphene.String(required=True)
-        rowstatus = graphene.Boolean(default_value=True)
+        rowstatus = graphene.Boolean(required=True)
 
     @login_required
     def mutate(self, info, productid, warehouseid, **kwargs):
@@ -154,48 +154,116 @@ class CreateInventory(graphene.Mutation):
             product = Product.objects.get(pk=productid)
             warehouse = Warehouse.objects.get(pk=warehouseid)
 
-        # Prepare the inventory object
-            inventory_fields = {
-            'productid': product,
-            'warehouseid': warehouse,
-            'quantityavailable': kwargs['quantityavailable'],
-            'minstocklevel': kwargs['minstocklevel'],
-            'maxstocklevel': kwargs['maxstocklevel'],
-            'createduser': kwargs['createduser'],
-            'modifieduser': kwargs['modifieduser'],
-            'rowstatus': kwargs['rowstatus']
-        }
+            # Set default values or handle None
+            invreorderpoint = kwargs.get('invreorderpoint', None)
+            if invreorderpoint is None:
+                invreorderpoint = None  # Or any default value you prefer
 
-        # Check if invreorderpoint is provided in kwargs
-            if 'invreorderpoint' in kwargs:
-                inventory_fields['invreorderpoint'] = kwargs['invreorderpoint']
-
-            inventory = Inventory(**inventory_fields)
+            inventory = Inventory(
+                productid=product,
+                warehouseid=warehouse,
+                quantityavailable=kwargs['quantityavailable'],
+                minstocklevel=kwargs['minstocklevel'],
+                maxstocklevel=kwargs['maxstocklevel'],
+                invreorderpoint=invreorderpoint,
+                createduser=kwargs['createduser'],
+                modifieduser=kwargs['modifieduser'],
+                rowstatus=kwargs['rowstatus']
+            )
             inventory.save()
 
-        # Fetch all inventories related to the product
+            # Fetch all inventories related to the product
             inventories = Inventory.objects.filter(productid=product)
 
             return CreateInventory(
-            inventories=inventories,
-            status_code=200,
-            message="Inventory entry created successfully."
-        )
+                inventories=inventories,
+                status_code=200,
+                message="Inventory entry created successfully."
+            )
         except Product.DoesNotExist:
             return CreateInventory(
-            status_code=404,
-            message="Product not found."
-        )
+                status_code=404,
+                message="Product not found."
+            )
         except Warehouse.DoesNotExist:
             return CreateInventory(
-            status_code=404,
-            message="Warehouse not found."
-        )
+                status_code=404,
+                message="Warehouse not found."
+            )
         except Exception as e:
             return CreateInventory(
-            status_code=400,
-            message=str(e)
-        )
+                status_code=400,
+                message=str(e)
+            )
+
+
+
+
+
+# class CreateInventory(graphene.Mutation):
+#     inventories = graphene.List(InventoryType)
+#     status_code = graphene.Int()
+#     message = graphene.String()
+
+#     class Arguments:
+#         productid = graphene.ID(required=True)
+#         quantityavailable = graphene.String(required=True)
+#         minstocklevel = graphene.String(required=True)
+#         maxstocklevel = graphene.String(required=True)
+#         invreorderpoint = graphene.Int()  
+#         warehouseid = graphene.ID(required=True)
+#         createduser = graphene.String(required=True)
+#         modifieduser = graphene.String(required=True)
+#         rowstatus = graphene.Boolean(default_value=True)
+
+#     @login_required
+#     def mutate(self, info, productid, warehouseid, **kwargs):
+#         try:
+#             product = Product.objects.get(pk=productid)
+#             warehouse = Warehouse.objects.get(pk=warehouseid)
+
+#         # Prepare the inventory object
+#             inventory_fields = {
+#             'productid': product,
+#             'warehouseid': warehouse,
+#             'quantityavailable': kwargs['quantityavailable'],
+#             'minstocklevel': kwargs['minstocklevel'],
+#             'maxstocklevel': kwargs['maxstocklevel'],
+#             'createduser': kwargs['createduser'],
+#             'modifieduser': kwargs['modifieduser'],
+#             'rowstatus': kwargs['rowstatus']
+#         }
+
+#         # Check if invreorderpoint is provided in kwargs
+#             if 'invreorderpoint' in kwargs:
+#                 inventory_fields['invreorderpoint'] = kwargs['invreorderpoint']
+
+#             inventory = Inventory(**inventory_fields)
+#             inventory.save()
+
+#         # Fetch all inventories related to the product
+#             inventories = Inventory.objects.filter(productid=product)
+
+#             return CreateInventory(
+#             inventories=inventories,
+#             status_code=200,
+#             message="Inventory entry created successfully."
+#         )
+#         except Product.DoesNotExist:
+#             return CreateInventory(
+#             status_code=404,
+#             message="Product not found."
+#         )
+#         except Warehouse.DoesNotExist:
+#             return CreateInventory(
+#             status_code=404,
+#             message="Warehouse not found."
+#         )
+#         except Exception as e:
+#             return CreateInventory(
+#             status_code=400,
+#             message=str(e)
+#         )
 
     # def mutate(self, info, productid, warehouseid, **kwargs):
     #     try:
