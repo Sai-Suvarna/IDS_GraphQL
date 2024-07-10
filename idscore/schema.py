@@ -12,6 +12,7 @@ class ProductType(DjangoObjectType):
         model = Product
 
 class InventoryType(DjangoObjectType):
+    invreorderpoint = graphene.Int()  
     warehouseid = graphene.Int()   
 
     class Meta:
