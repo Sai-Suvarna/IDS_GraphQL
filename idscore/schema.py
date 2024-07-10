@@ -151,7 +151,6 @@ class CreateInventory(graphene.Mutation):
     status_code = graphene.Int()
     message = graphene.String()
 
-    
     @login_required
     def mutate(self, info, input):
         try:
@@ -184,6 +183,65 @@ class CreateInventory(graphene.Mutation):
 
 
 
+class UpdateInventoryInput(graphene.InputObjectType):
+    inventoryid = graphene.ID(required=True)
+    quantityavailable = graphene.String()
+    minstocklevel = graphene.String()
+    maxstocklevel = graphene.String()
+    invreorderpoint = graphene.Int()
+    warehouseid = graphene.ID()
+    modifieduser = graphene.String()
+    rowstatus = graphene.Boolean()
+
+
+class UpdateInventory(graphene.Mutation):
+    class Arguments:
+        input = UpdateInventoryInput(required=True)
+
+    inventories = graphene.List(InventoryType)
+    status_code = graphene.Int()
+    message = graphene.String()
+
+    def mutate(self, info, input):
+        try:
+            inventory = Inventory.objects.get(pk=input.inventoryid)
+            
+            if input.quantityavailable is not None:
+                inventory.quantityavailable = input.quantityavailable
+            if input.minstocklevel is not None:
+                inventory.minstocklevel = input.minstocklevel
+            if input.maxstocklevel is not None:
+                inventory.maxstocklevel = input.maxstocklevel
+            if input.invreorderpoint is not None:
+                inventory.invreorderpoint = input.invreorderpoint
+            if input.warehouseid is not None:
+                warehouse = Warehouse.objects.get(pk=input.warehouseid)
+                inventory.warehouseid = warehouse
+            if input.modifieduser is not None:
+                inventory.modifieduser = input.modifieduser
+            if input.rowstatus is not None:
+                inventory.rowstatus = input.rowstatus
+
+            inventory.save()
+
+            # Fetch all inventories related to the product
+            inventories = Inventory.objects.filter(productid=inventory.productid)
+
+            return UpdateInventory(
+                inventories=inventories,
+                status_code=200,
+                message="Inventory entry updated successfully."
+            )
+        except Inventory.DoesNotExist:
+            return UpdateInventory(
+                status_code=404,
+                message="Inventory entry not found."
+            )
+        except Exception as e:
+            return UpdateInventory(
+                status_code=400,
+                message=str(e)
+            )
 
 
 
@@ -502,16 +560,21 @@ class UpdateBatch(graphene.Mutation):
             batch = Batch.objects.get(batchid=batchid)
             productid = kwargs.get('productid')
             if productid:
-                batch.productid = Product.objects.get(productid=productid)
+                product = Product.objects.get(productid=productid)  # Retrieve the product
+                batch.productid = product
             for key, value in kwargs.items():
                 if key != 'productid':
                     setattr(batch, key, value)
             batch.save()
 
             # Retrieve all batches after update
-            batches = Batch.objects.filter(productid=product)
+            batches = Batch.objects.filter(productid=batch.productid)
 
             return UpdateBatch(batches=batches, status_code=200, message="Batch updated successfully.")
+        except Batch.DoesNotExist:
+            return UpdateBatch(status_code=404, message="Batch not found.")
+        except Product.DoesNotExist:
+            return UpdateBatch(status_code=404, message="Product not found.")
         except Exception as e:
             return UpdateBatch(status_code=400, message=str(e))
 
@@ -999,6 +1062,8 @@ class Mutation(graphene.ObjectType):
     delete_placement = DeletePlacement.Field()
 
     create_inventory = CreateInventory.Field()
+    update_inventory = UpdateInventory.Field()
+
 
 
 
