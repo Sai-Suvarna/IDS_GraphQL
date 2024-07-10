@@ -131,42 +131,38 @@ class DeleteCategory(graphene.Mutation):
         except Exception as e:
             return DeleteCategory(status_code=400, message=str(e))
 
-class InventoryInput(graphene.InputObjectType):
-    productid = graphene.ID(required=True)
-    quantityavailable = graphene.String(required=True)
-    minstocklevel = graphene.String(required=True)
-    maxstocklevel = graphene.String(required=True)
-    invreorderpoint = graphene.Int(required=True)
-    warehouseid = graphene.ID(required=True)
-    createduser = graphene.String(required=True)
-    modifieduser = graphene.String(required=True)
-    rowstatus = graphene.Boolean(required=True)
-
 
 class CreateInventory(graphene.Mutation):
-    class Arguments:
-        input = InventoryInput(required=True)
-
     inventories = graphene.List(InventoryType)
     status_code = graphene.Int()
     message = graphene.String()
 
-    @login_required
-    def mutate(self, info, input):
+    class Arguments:
+        productid = graphene.ID(required=True)
+        quantityavailable = graphene.String(required=True)
+        minstocklevel = graphene.String(required=True)
+        maxstocklevel = graphene.String(required=True)
+        invreorderpoint = graphene.Int(required=True)
+        warehouseid = graphene.ID(required=True)
+        createduser = graphene.String(required=True)
+        modifieduser = graphene.String(required=True)
+        rowstatus = graphene.Boolean(required=True)
+
+    def mutate(self, info, productid, warehouseid, **kwargs):
         try:
-            product = Product.objects.get(pk=input.productid)
-            warehouse = Warehouse.objects.get(pk=input.warehouseid)
+            product = Product.objects.get(pk=productid)
+            warehouse = Warehouse.objects.get(pk=warehouseid)
 
             inventory = Inventory(
                 productid=product,
-                quantityavailable=input.quantityavailable,
-                minstocklevel=input.minstocklevel,
-                maxstocklevel=input.maxstocklevel,
-                invreorderpoint=input.invreorderpoint,
                 warehouseid=warehouse,
-                createduser=input.createduser,
-                modifieduser=input.modifieduser,
-                rowstatus=input.rowstatus,
+                quantityavailable=kwargs['quantityavailable'],
+                minstocklevel=kwargs['minstocklevel'],
+                maxstocklevel=kwargs['maxstocklevel'],
+                invreorderpoint=kwargs['invreorderpoint'],
+                createduser=kwargs['createduser'],
+                modifieduser=kwargs['modifieduser'],
+                rowstatus=kwargs['rowstatus']
             )
             inventory.save()
 
@@ -178,49 +174,56 @@ class CreateInventory(graphene.Mutation):
                 status_code=200,
                 message="Inventory entry created successfully."
             )
+        except Product.DoesNotExist:
+            return CreateInventory(
+                status_code=404,
+                message="Product not found."
+            )
+        except Warehouse.DoesNotExist:
+            return CreateInventory(
+                status_code=404,
+                message="Warehouse not found."
+            )
         except Exception as e:
-            return CreateInventory(status_code=400, message=str(e))
-
-
-
-class UpdateInventoryInput(graphene.InputObjectType):
-    inventoryid = graphene.ID(required=True)
-    quantityavailable = graphene.String()
-    minstocklevel = graphene.String()
-    maxstocklevel = graphene.String()
-    invreorderpoint = graphene.Int()
-    warehouseid = graphene.ID()
-    modifieduser = graphene.String()
-    rowstatus = graphene.Boolean()
-
+            return CreateInventory(
+                status_code=400,
+                message=str(e)
+            )
 
 class UpdateInventory(graphene.Mutation):
-    class Arguments:
-        input = UpdateInventoryInput(required=True)
-
     inventories = graphene.List(InventoryType)
     status_code = graphene.Int()
     message = graphene.String()
 
-    def mutate(self, info, input):
+    class Arguments:
+        inventoryid = graphene.ID(required=True)
+        quantityavailable = graphene.String(required=False)
+        minstocklevel = graphene.String(required=False)
+        maxstocklevel = graphene.String(required=False)
+        invreorderpoint = graphene.Int(required=False)
+        warehouseid = graphene.ID(required=False)
+        modifieduser = graphene.String(required=False)
+        rowstatus = graphene.Boolean(required=False)
+
+    def mutate(self, info, inventoryid, **kwargs):
         try:
-            inventory = Inventory.objects.get(pk=input.inventoryid)
-            
-            if input.quantityavailable is not None:
-                inventory.quantityavailable = input.quantityavailable
-            if input.minstocklevel is not None:
-                inventory.minstocklevel = input.minstocklevel
-            if input.maxstocklevel is not None:
-                inventory.maxstocklevel = input.maxstocklevel
-            if input.invreorderpoint is not None:
-                inventory.invreorderpoint = input.invreorderpoint
-            if input.warehouseid is not None:
-                warehouse = Warehouse.objects.get(pk=input.warehouseid)
+            inventory = Inventory.objects.get(pk=inventoryid)
+
+            if 'quantityavailable' in kwargs:
+                inventory.quantityavailable = kwargs['quantityavailable']
+            if 'minstocklevel' in kwargs:
+                inventory.minstocklevel = kwargs['minstocklevel']
+            if 'maxstocklevel' in kwargs:
+                inventory.maxstocklevel = kwargs['maxstocklevel']
+            if 'invreorderpoint' in kwargs:
+                inventory.invreorderpoint = kwargs['invreorderpoint']
+            if 'warehouseid' in kwargs:
+                warehouse = Warehouse.objects.get(pk=kwargs['warehouseid'])
                 inventory.warehouseid = warehouse
-            if input.modifieduser is not None:
-                inventory.modifieduser = input.modifieduser
-            if input.rowstatus is not None:
-                inventory.rowstatus = input.rowstatus
+            if 'modifieduser' in kwargs:
+                inventory.modifieduser = kwargs['modifieduser']
+            if 'rowstatus' in kwargs:
+                inventory.rowstatus = kwargs['rowstatus']
 
             inventory.save()
 
@@ -230,19 +233,23 @@ class UpdateInventory(graphene.Mutation):
             return UpdateInventory(
                 inventories=inventories,
                 status_code=200,
-                message="Inventory entry updated successfully."
+                message="Inventory updated successfully."
             )
         except Inventory.DoesNotExist:
             return UpdateInventory(
                 status_code=404,
-                message="Inventory entry not found."
+                message="Inventory not found."
+            )
+        except Warehouse.DoesNotExist:
+            return UpdateInventory(
+                status_code=404,
+                message="Warehouse not found."
             )
         except Exception as e:
             return UpdateInventory(
                 status_code=400,
                 message=str(e)
             )
-
 
 
 
