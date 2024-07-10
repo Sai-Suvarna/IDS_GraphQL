@@ -378,6 +378,7 @@ class UpdateProduct(graphene.Mutation):
     status_code = graphene.Int()
     message = graphene.String()
 
+    @login_required
     def mutate(self, info, product_id, productcode=None, qrcode=None, productname=None, productdescription=None, productcategory=None, reorderpoint=None, brand=None, weight=None, dimensions=None, images=None, createduser=None, modifieduser=None, inventory_details=None):
         try:
             # Fetch the existing Product instance
