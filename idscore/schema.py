@@ -147,7 +147,7 @@ class CreateInventory(graphene.Mutation):
         warehouseid = graphene.ID(required=True)
         createduser = graphene.String(required=True)
         modifieduser = graphene.String(required=True)
-        rowstatus = graphene.Boolean(required=True)
+        rowstatus = graphene.Boolean(default_value=True)
 
     @login_required
     def mutate(self, info, productid, warehouseid, **kwargs):
