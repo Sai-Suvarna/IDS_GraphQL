@@ -12,8 +12,13 @@ class ProductType(DjangoObjectType):
         model = Product
 
 class InventoryType(DjangoObjectType):
+    warehouseid = graphene.Int()   
+
     class Meta:
         model = Inventory
+    
+    def resolve_warehouseid(self, info):
+        return self.warehouseid.pk  # Return the primary key of the warehouse
 
 class LocationType(DjangoObjectType):
     class Meta:
@@ -22,7 +27,6 @@ class LocationType(DjangoObjectType):
 class WarehouseType(DjangoObjectType):
     class Meta:
         model = Warehouse
-
 
     # Resolve the relationship with Location
     location = graphene.Field(LocationType)
@@ -70,7 +74,6 @@ class CreateCategory(graphene.Mutation):
             return CreateCategory(category=category, status_code=200, message="Category created successfully.")
         except Exception as e:
             return CreateCategory(status_code=400, message=str(e))
-
 
 
 class UpdateCategory(graphene.Mutation):
@@ -127,6 +130,63 @@ class DeleteCategory(graphene.Mutation):
             raise Exception(f"Category with id {category_id} does not exist.")
         except Exception as e:
             return DeleteCategory(status_code=400, message=str(e))
+
+class InventoryInput(graphene.InputObjectType):
+    productid = graphene.ID(required=True)
+    quantityavailable = graphene.String(required=True)
+    minstocklevel = graphene.String(required=True)
+    maxstocklevel = graphene.String(required=True)
+    invreorderpoint = graphene.Int(required=True)
+    warehouseid = graphene.ID(required=True)
+    createduser = graphene.String(required=True)
+    modifieduser = graphene.String(required=True)
+    rowstatus = graphene.Boolean(required=True)
+
+
+class CreateInventory(graphene.Mutation):
+    class Arguments:
+        input = InventoryInput(required=True)
+
+    inventories = graphene.List(InventoryType)
+    status_code = graphene.Int()
+    message = graphene.String()
+
+    def mutate(self, info, input):
+        try:
+            product = Product.objects.get(pk=input.productid)
+            warehouse = Warehouse.objects.get(pk=input.warehouseid)
+
+            inventory = Inventory(
+                productid=product,
+                quantityavailable=input.quantityavailable,
+                minstocklevel=input.minstocklevel,
+                maxstocklevel=input.maxstocklevel,
+                invreorderpoint=input.invreorderpoint,
+                warehouseid=warehouse,
+                createduser=input.createduser,
+                modifieduser=input.modifieduser,
+                rowstatus=input.rowstatus,
+            )
+            inventory.save()
+
+            # Fetch all inventories related to the product
+            inventories = Inventory.objects.filter(productid=product)
+
+            return CreateInventory(
+                inventories=inventories,
+                status_code=200,
+                message="Inventory entry created successfully."
+            )
+        except Exception as e:
+            return CreateInventory(status_code=400, message=str(e))
+
+
+
+
+
+
+
+
 
 # Input Object Type for Inventory details
 class InventoryInputType(graphene.InputObjectType):
@@ -935,6 +995,9 @@ class Mutation(graphene.ObjectType):
     create_placement = CreatePlacement.Field()
     update_placement = UpdatePlacement.Field()
     delete_placement = DeletePlacement.Field()
+
+    create_inventory = CreateInventory.Field()
+
 
 
 # Define the GraphQL schema with defined Query and Mutation
