@@ -47,7 +47,7 @@ class UpdateLogin(graphene.Mutation):
     login = graphene.Field(LoginType)
 
     class Arguments:
-        id = graphene.String(required=True)
+        userId = graphene.String(required=True)
         username = graphene.String()
         phone_num = graphene.String()
         designation = graphene.String()
@@ -58,9 +58,9 @@ class UpdateLogin(graphene.Mutation):
         status = graphene.Boolean()
         password = graphene.String()
 
-    def mutate(self, info, id, username=None, phone_num=None, designation=None, location=None, business_unit=None, role=None, email=None, status=None, password=None):
+    def mutate(self, info, userId, username=None, phone_num=None, designation=None, location=None, business_unit=None, role=None, email=None, status=None, password=None):
         try:
-            login = Login.objects.get(pk=id)
+            login = Login.objects.get(pk=userId)
             if username:
                 login.username = username
             if phone_num:
@@ -88,11 +88,11 @@ class DeleteLogin(graphene.Mutation):
     success = graphene.Boolean()
 
     class Arguments:
-        id = graphene.String(required=True)
+        userId = graphene.String(required=True)
 
-    def mutate(self, info, id):
+    def mutate(self, info, userId):
         try:
-            login = Login.objects.get(pk=id)
+            login = Login.objects.get(pk=userId)
             login.delete()
             return DeleteLogin(success=True)
         except Login.DoesNotExist:
