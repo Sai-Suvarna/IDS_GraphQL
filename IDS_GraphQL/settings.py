@@ -25,12 +25,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # # SECURITY WARNING: keep the secret key used in production secret!
-# SECRET_KEY = 'django-insecure-)0e5be#9fv9z-)8m_ns_r!&jugs$djcs9l7twx(0c5abuuf3oc'
+SECRET_KEY = 'django-insecure-)0e5be#9fv9z-)8m_ns_r!&jugs$djcs9l7twx(0c5abuuf3oc'
 
 # SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-)0e5be#9fv9z-)8m_ns_r!&jugs$djcs9l7twx(0c5abuuf3oc')
 # JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', '9a9d6ca22c332fd00c445fbabb3b55c73f52cbf3a690ac388d2b08ded3aadabc')
 
-SECRET_KEY='W2IjUe3kllnnZGWGDnRj8R3EukdojlSM8OlLUIJSvkA'
+# SECRET_KEY='W2IjUe3kllnnZGWGDnRj8R3EukdojlSM8OlLUIJSvkA'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     #installed_apps
     'graphene_django',
     'graphql_jwt.refresh_token.apps.RefreshTokenConfig',
+    'django_elasticsearch_dsl',
     #local_apps
     'Authentication',
     'Core',
@@ -60,6 +61,16 @@ INSTALLED_APPS = [
     
 
 ]
+
+
+ELASTICSEARCH_DSL = {
+    'default': {
+        'hosts': 'http://localhost:9200'
+    },
+}
+
+
+
 AUTH_USER_MODEL='Authentication.Login'
 MIDDLEWARE = [
 
@@ -188,6 +199,7 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
 
+JWT_SECRET_KEY = 'W2IjUe3kllnnZGWGDnRj8R3EukdojlSM8OlLUIJSvkA'
 
 # GRAPHQL_JWT = {
 #     'JWT_VERIFY_EXPIRATION': True,
