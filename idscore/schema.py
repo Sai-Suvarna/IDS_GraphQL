@@ -12,19 +12,19 @@ class ProductType(DjangoObjectType):
         model = Product
     
 class InventoryType(DjangoObjectType):
-    invreorderpoint = graphene.Int()  # Make it nullable
-    warehousename = graphene.String()
-    warehouseid = graphene.Int()   
+    invreOrderPoint = graphene.Int()  # Make it nullable
+    warehouseName = graphene.String()
+    warehouseId = graphene.Int()   
 
     class Meta:
         model = Inventory
     
     def resolve_warehouseid(self, info):
-        return self.warehouseid.pk  # Return the primary key of the warehouse
+        return self.warehouseId.pk  # Return the primary key of the warehouse
     
     def resolve_warehousename(self, info):
         # Resolve warehousename from the related Warehouse object
-        return self.warehouseid.warehousename if self.warehouseid else None
+        return self.warehouseId.warehouseName if self.warehouseId else None
 
 
 class LocationType(DjangoObjectType):
@@ -39,7 +39,7 @@ class WarehouseType(DjangoObjectType):
     location = graphene.Field(LocationType)
 
     def resolve_location(self, info):
-        return self.locationid
+        return self.locationId
 
 class CategoryType(DjangoObjectType):
     class Meta:
@@ -51,16 +51,19 @@ class BatchType(DjangoObjectType):
 
 
 class PlacementType(DjangoObjectType):
-    warehousename = graphene.String()
+    productId = graphene.Field(ProductType)
+    warehouseId = graphene.Field(WarehouseType)
+
+    warehouseName = graphene.String()
 
     class Meta:
         model = Placement
-        # fields = ("placementId", "warehouseid", "aile", "bin")  # Include other necessary fields
+        fields = ('placementId', 'productId', 'warehouseId', 'placementQuantity', 'aile', 'bin', 'createdUser', 'modifiedUser', 'createdTime', 'modifiedTime')
 
 
     def resolve_warehousename(self, info):
         # Resolve warehousename from the related Warehouse object
-        return self.warehouseid.warehousename if self.warehouseid else None
+        return self.warehouseId.warehouseName if self.warehouseId else None
 
 
 class DeleteRequestType(DjangoObjectType):
@@ -89,7 +92,7 @@ class CreateCategory(graphene.Mutation):
         rowstatus = graphene.Boolean(default_value=True)
 
     category = graphene.Field(CategoryType)
-    status_code = graphene.Int()
+    statusCode = graphene.Int()
     message = graphene.String()
     
     @login_required
@@ -99,27 +102,27 @@ class CreateCategory(graphene.Mutation):
             category.save()
             return CreateCategory(category=category, status_code=200, message="Category created successfully.")
         except Exception as e:
-            return CreateCategory(status_code=400, message=str(e))
+            return CreateCategory(statusCode=400, message=str(e))
 
 
 class UpdateCategory(graphene.Mutation):
     class Arguments:
-        category_id = graphene.ID(required=True)
+        categoryId = graphene.ID(required=True)
         name = graphene.String()
         image = graphene.String()
         rowstatus = graphene.Boolean()
 
     category = graphene.Field(CategoryType)
-    status_code = graphene.Int()
+    statusCode = graphene.Int()
     message = graphene.String()
     
     @login_required
-    def mutate(self, info, category_id, name=None, image=None, rowstatus=None):
+    def mutate(self, info, categoryId, name=None, image=None, rowstatus=None):
         try:
             # Retrieve the existing Category object
-            category = Category.objects.get(pk=category_id)
+            category = Category.objects.get(pk=categoryId)
         except Category.DoesNotExist:
-            raise Exception(f"Category with id {category_id} does not exist.")
+            raise Exception(f"Category with id {categoryId} does not exist.")
 
         try:
             # Update the Category fields if provided
@@ -133,169 +136,169 @@ class UpdateCategory(graphene.Mutation):
             category.save()
             return UpdateCategory(category=category, status_code=200, message="Category updated successfully.")
         except Exception as e:
-            return UpdateCategory(status_code=400, message=str(e))
+            return UpdateCategory(statusCode=400, message=str(e))
 
 
 class DeleteCategory(graphene.Mutation):
     class Arguments:
-        category_id = graphene.ID(required=True)
+        categoryId = graphene.ID(required=True)
 
-    category_id = graphene.ID()
-    status_code = graphene.Int()
+    categoryId = graphene.ID()
+    statusCode = graphene.Int()
     message = graphene.String()
    
     @login_required
-    def mutate(self, info, category_id):
+    def mutate(self, info, categoryId):
         try:
             # Soft delete the Category by setting rowstatus to False
-            category = Category.objects.get(pk=category_id)
+            category = Category.objects.get(pk=categoryId)
             category.rowstatus = False  # Soft delete by setting rowstatus to False
             category.save()
-            return DeleteCategory(category_id=category_id, status_code=200, message="Category deleted successfully.")
+            return DeleteCategory(category_id=categoryId, status_code=200, message="Category deleted successfully.")
         except Category.DoesNotExist:
-            raise Exception(f"Category with id {category_id} does not exist.")
+            raise Exception(f"Category with id {categoryId} does not exist.")
         except Exception as e:
-            return DeleteCategory(status_code=400, message=str(e))
+            return DeleteCategory(statusCode=400, message=str(e))
 
 
 class CreateInventory(graphene.Mutation):
     inventories = graphene.List(InventoryType)
-    status_code = graphene.Int()
+    statusCode = graphene.Int()
     message = graphene.String()
 
     class Arguments:
-        productid = graphene.ID(required=True)
-        quantityavailable = graphene.String(required=True)
-        minstocklevel = graphene.String(required=True)
-        maxstocklevel = graphene.String(required=True)
-        invreorderpoint = graphene.Int()  # Optional argument
-        warehouseid = graphene.ID(required=True)
+        productId = graphene.ID(required=True)
+        quantityAvailable = graphene.String()
+        minStockLevel = graphene.String(required=True)
+        maxStockLevel = graphene.String(required=True)
+        invreOrderPoint = graphene.Int()  # Optional argument
+        warehouseId = graphene.ID(required=True)
         rowstatus = graphene.Boolean(default_value=True)
 
     @login_required
-    def mutate(self, info, productid, warehouseid, **kwargs):
+    def mutate(self, info, productId, warehouseId, **kwargs):
         try:
-            product = Product.objects.get(pk=productid)
-            warehouse = Warehouse.objects.get(pk=warehouseid)
+            product = Product.objects.get(pk=productId)
+            warehouse = Warehouse.objects.get(pk=warehouseId)
 
             # Get the username from the token
             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
             username = get_username_from_token(token)
 
             # Set default values or handle None
-            invreorderpoint = kwargs.get('invreorderpoint', None)
+            invreOrderPoint = kwargs.get('invreorderpoint', None)
 
             # Use get_or_create to handle unique constraint
             inventory, created = Inventory.objects.get_or_create(
-                productid=product,
-                warehouseid=warehouse,
+                productId=product,
+                warehouseId=warehouse,
                 defaults={
-                    'quantityavailable': kwargs['quantityavailable'],
-                    'minstocklevel': kwargs['minstocklevel'],
-                    'maxstocklevel': kwargs['maxstocklevel'],
-                    'invreorderpoint': invreorderpoint,
-                    'createduser': username,
-                    'modifieduser': username,
+                    'quantityAvailable': kwargs['quantityAvailable'],
+                    'minStockLevel': kwargs['minStockLevel'],
+                    'maxStockLevel': kwargs['maxStockLevel'],
+                    'invreOrderPoint': invreOrderPoint,
+                    'createdUser': username,
+                    'modifiedUser': username,
                     'rowstatus': kwargs['rowstatus']
                 }
             )
 
             if not created:
                 # If the inventory entry already exists, update it
-                inventory.quantityavailable = kwargs['quantityavailable']
-                inventory.minstocklevel = kwargs['minstocklevel']
-                inventory.maxstocklevel = kwargs['maxstocklevel']
-                inventory.invreorderpoint = invreorderpoint
-                inventory.modifieduser = username
+                inventory.quantityAvailable = kwargs['quantityAvailable']
+                inventory.minStockLevel = kwargs['minStockLevel']
+                inventory.maxStockLevel = kwargs['maxStockLevel']
+                inventory.invreOrderPoint = invreOrderPoint
+                inventory.modifiedUser = username
                 inventory.rowstatus = kwargs['rowstatus']
                 inventory.save()
 
             # Fetch all inventories related to the product
-            inventories = Inventory.objects.filter(productid=product)
+            inventories = Inventory.objects.filter(productId=product)
 
             return CreateInventory(
                 inventories=inventories,
-                status_code=200,
+                statusCode=200,
                 message="Inventory entry created successfully."
             )
         except Product.DoesNotExist:
             return CreateInventory(
-                status_code=404,
+                statusCode=404,
                 message="Product not found."
             )
         except Warehouse.DoesNotExist:
             return CreateInventory(
-                status_code=404,
+                statusCode=404,
                 message="Warehouse not found."
             )
         except Exception as e:
             return CreateInventory(
-                status_code=400,
+                statusCode=400,
                 message=str(e)
             )
 
 
 class UpdateInventory(graphene.Mutation):
     inventories = graphene.List(InventoryType)
-    status_code = graphene.Int()
+    statusCode = graphene.Int()
     message = graphene.String()
 
     class Arguments:
-        inventoryid = graphene.ID(required=True)
-        quantityavailable = graphene.String(required=False)
-        minstocklevel = graphene.String(required=False)
-        maxstocklevel = graphene.String(required=False)
-        invreorderpoint = graphene.Int(required=False)  # Optional argument
-        warehouseid = graphene.ID(required=False)
+        inventoryId = graphene.ID(required=True)
+        quantityAvailable = graphene.String(required=False)
+        minStockLevel = graphene.String(required=False)
+        maxStockLevel = graphene.String(required=False)
+        invreOrderPoint = graphene.Int(required=False)  # Optional argument
+        warehouseId = graphene.ID(required=False)
         rowstatus = graphene.Boolean()
 
     @login_required
-    def mutate(self, info, inventoryid, **kwargs):
+    def mutate(self, info, inventoryId, **kwargs):
         try:
-            inventory = Inventory.objects.get(pk=inventoryid)
+            inventory = Inventory.objects.get(pk=inventoryId)
 
             # Get the username from the token
             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
             username = get_username_from_token(token)
 
-            if 'quantityavailable' in kwargs:
-                inventory.quantityavailable = kwargs['quantityavailable']
-            if 'minstocklevel' in kwargs:
-                inventory.minstocklevel = kwargs['minstocklevel']
-            if 'maxstocklevel' in kwargs:
-                inventory.maxstocklevel = kwargs['maxstocklevel']
-            if 'invreorderpoint' in kwargs:
-                inventory.invreorderpoint = kwargs['invreorderpoint']
-            if 'warehouseid' in kwargs:
-                warehouse = Warehouse.objects.get(pk=kwargs['warehouseid'])
-                inventory.warehouseid = warehouse
-            inventory.modifieduser = username
+            if 'quantityAvailable' in kwargs:
+                inventory.quantityAvailable = kwargs['quantityAvailable']
+            if 'minStockLevel' in kwargs:
+                inventory.minStockLevel = kwargs['minStockLevel']
+            if 'maxStockLevel' in kwargs:
+                inventory.maxStockLevel = kwargs['maxStockLevel']
+            if 'invreOrderPoint' in kwargs:
+                inventory.invreOrderPoint = kwargs['invreOrderPoint']
+            if 'warehouseId' in kwargs:
+                warehouse = Warehouse.objects.get(pk=kwargs['warehouseId'])
+                inventory.warehouseId = warehouse
+            inventory.modifiedUser = username
             if 'rowstatus' in kwargs:
                 inventory.rowstatus = kwargs['rowstatus']
 
             inventory.save()
 
             # Fetch all inventories related to the product
-            inventories = Inventory.objects.filter(productid=inventory.productid)
+            inventories = Inventory.objects.filter(productId=inventory.productId)
 
             return UpdateInventory(
                 inventories=inventories,
-                status_code=200,
+                statusCode=200,
                 message="Inventory updated successfully."
             )
         except Inventory.DoesNotExist:
             return UpdateInventory(
-                status_code=404,
+                statusCode=404,
                 message="Inventory not found."
             )
         except Warehouse.DoesNotExist:
             return UpdateInventory(
-                status_code=404,
+                statusCode=404,
                 message="Warehouse not found."
             )
         except Exception as e:
             return UpdateInventory(
-                status_code=400,
+                statusCode=400,
                 message=str(e)
             )
 
@@ -303,33 +306,34 @@ class UpdateInventory(graphene.Mutation):
 
 # Input Object Type for Inventory details
 class InventoryInputType(graphene.InputObjectType):
-    warehouseid = graphene.Int(required=True)
-    minstocklevel = graphene.String(required=True)
-    maxstocklevel = graphene.String(required=True)
-    quantityavailable = graphene.String()
-    invreorderpoint = graphene.Int()  
+    warehouseId = graphene.Int(required=True)
+    minStockLevel = graphene.String(required=True)
+    maxStockLevel = graphene.String(required=True)
+    quantityAvailable = graphene.String(required=False)
+    invreOrderPoint = graphene.Int()  
 
 from IDS_GraphQL.utils import get_username_from_token
 
+
 class CreateProduct(graphene.Mutation):
     class Arguments:
-        productcode = graphene.String(required=True)
-        qrcode = graphene.String()
-        productname = graphene.String(required=True)
-        productdescription = graphene.String(required=True)
-        productcategory = graphene.String(required=True)
-        reorderpoint = graphene.Int()
+        productCode = graphene.String(required=True)
+        qrCode = graphene.String()
+        productName = graphene.String(required=True)
+        productDescription = graphene.String(required=True)
+        productCategory = graphene.String(required=True)
+        reOrderPoint = graphene.Int()
         brand = graphene.String()
         weight = graphene.String()
         dimensions = graphene.String()
         images = graphene.List(graphene.String)
         inventory_details = graphene.List(InventoryInputType, required=True)
 
-    status_code = graphene.Int()
+    statusCode = graphene.Int()
     message = graphene.String()
 
     @login_required
-    def mutate(self, info, productcode, qrcode, productname, productdescription, productcategory, reorderpoint, brand, weight, dimensions, images, inventory_details):
+    def mutate(self, info, productCode, qrCode, productName, productDescription, productCategory, reOrderPoint, brand, weight, dimensions, images, inventory_details):
         try:
             # Get the username from the token
             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
@@ -340,104 +344,105 @@ class CreateProduct(graphene.Mutation):
 
             # Check if productcategory is an integer
             try:
-                productcategory_id = int(productcategory)
+                productCategory_id = int(productCategory)
             except ValueError:
                 # If productcategory cannot be converted to an integer, treat it as a string
-                category, created = Category.objects.get_or_create(name=productcategory)
-                productcategory_id = category.category_id
+                category, created = Category.objects.get_or_create(name=productCategory)
+                productCategory_id = category.categoryId
 
             # Create the Product instance
             product = Product(
-                productcode=productcode,
-                qrcode=qrcode,
-                productname=productname,
-                productdescription=productdescription,
-                productcategory=productcategory_id,
-                reorderpoint=reorderpoint,
+                productCode=productCode,
+                qrCode=qrCode,
+                productName=productName,
+                productDescription=productDescription,
+                productCategory=productCategory_id,
+                reOrderPoint=reOrderPoint,
                 brand=brand,
                 weight=weight,
                 dimensions=dimensions,
                 images=images_json,
-                createduser=username,
-                modifieduser=username
+                createdUser=username,
+                modifiedUser=username
             )
             product.save()
 
             # Create Inventory instances related to the Product
             for inventory_detail in inventory_details:
-                warehouse = Warehouse.objects.get(pk=inventory_detail['warehouseid'])
-                quantityavailable = inventory_detail.get('quantityavailable', None)  # Default to None if not provided
+                warehouse = Warehouse.objects.get(pk=inventory_detail['warehouseId'])
+                quantityAvailable = inventory_detail.get('quantityAvailable', None)  # Default to None if not provided
                 inventory, created = Inventory.objects.get_or_create(
-                    productid=product,
-                    warehouseid=warehouse,
+                    productId=product,
+                    warehouseId=warehouse,
                     defaults={
-                        'quantityavailable': quantityavailable,
-                        'minstocklevel': inventory_detail['minstocklevel'],
-                        'maxstocklevel': inventory_detail['maxstocklevel'],
-                        'invreorderpoint': inventory_detail['invreorderpoint'],
-                        'createduser': username,
-                        'modifieduser': username
+                        'quantityAvailable': quantityAvailable,
+                        'minStockLevel': inventory_detail['minStockLevel'],
+                        'maxStockLevel': inventory_detail['maxStockLevel'],
+                        'invreOrderPoint': inventory_detail['invreOrderPoint'],
+                        'createdUser': username,
+                        'modifiedUser': username
                     }
                 )
                 if not created:
                     # If inventory entry already exists, update it
-                    inventory.quantityavailable = quantityavailable
-                    inventory.minstocklevel = inventory_detail['minstocklevel']
-                    inventory.maxstocklevel = inventory_detail['maxstocklevel']
-                    inventory.invreorderpoint = inventory_detail['invreorderpoint']
-                    inventory.modifieduser = username
+                    inventory.quantityAvailable = quantityAvailable
+                    inventory.minStockLevel = inventory_detail['minStockLevel']
+                    inventory.maxStockLevel = inventory_detail['maxStockLevel']
+                    inventory.invreOrderPoint = inventory_detail['invreOrderPoint']
+                    inventory.modifiedUser = username
                     inventory.save()
 
-            return CreateProduct(status_code=200, message="Product and inventories created successfully.")
+            return CreateProduct(statusCode=200, message="Product and inventories created successfully.")
         except Exception as e:
-            return CreateProduct(status_code=400, message=str(e))
-            
+            return CreateProduct(statusCode=400, message=str(e))
+
+
 class UpdateProduct(graphene.Mutation):
     class Arguments:
-        product_id = graphene.ID(required=True)
-        productcode = graphene.String()
-        qrcode = graphene.String()
-        productname = graphene.String()
-        productdescription = graphene.String()
-        productcategory = graphene.String()
-        reorderpoint = graphene.Int()
+        productId = graphene.ID(required=True)
+        productCode = graphene.String()
+        qrCode = graphene.String()
+        productName = graphene.String()
+        productDescription = graphene.String()
+        productCategory = graphene.String()
+        reOrderPoint = graphene.Int()
         brand = graphene.String()
         weight = graphene.String()
         dimensions = graphene.String()
         images = graphene.List(graphene.String)
         inventory_details = graphene.List(InventoryInputType)
 
-    status_code = graphene.Int()
+    statusCode = graphene.Int()
     message = graphene.String()
 
     @login_required
-    def mutate(self, info, product_id, productcode=None, qrcode=None, productname=None, productdescription=None, productcategory=None, reorderpoint=None, brand=None, weight=None, dimensions=None, images=None, inventory_details=None):
+    def mutate(self, info, productId, productCode=None, qrCode=None, productName=None, productDescription=None, productCategory=None, reOrderPoint=None, brand=None, weight=None, dimensions=None, images=None, inventory_details=None):
         try:
             # Get the username from the token
             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
             username = get_username_from_token(token)
 
             # Fetch the existing Product instance
-            product = Product.objects.get(pk=product_id)
+            product = Product.objects.get(pk=productId)
 
             # Update the product fields if provided
-            if productcode:
-                product.productcode = productcode
-            if qrcode:
-                product.qrcode = qrcode
-            if productname:
-                product.productname = productname
-            if productdescription:
-                product.productdescription = productdescription
-            if productcategory:
+            if productCode:
+                product.productCode = productCode
+            if qrCode:
+                product.qrCode = qrCode
+            if productName:
+                product.productName = productName
+            if productDescription:
+                product.productDescription = productDescription
+            if productCategory:
                 try:
-                    productcategory_id = int(productcategory)
+                    productCategory_id = int(productCategory)
                 except ValueError:
-                    category, created = Category.objects.get_or_create(name=productcategory)
-                    productcategory_id = category.category_id
-                product.productcategory = productcategory_id
-            if reorderpoint is not None:
-                product.reorderpoint = reorderpoint
+                    category, created = Category.objects.get_or_create(name=productCategory)
+                    productCategory_id = category.category_id
+                product.productCategory = productCategory_id
+            if reOrderPoint is not None:
+                product.reOrderPoint = reOrderPoint
             if brand:
                 product.brand = brand
             if weight:
@@ -447,108 +452,108 @@ class UpdateProduct(graphene.Mutation):
             if images:
                 product.images = json.dumps(images)
 
-            product.modifieduser = username
+            product.modifiedUser = username
             product.save()
 
             # Update related Inventory instances
             if inventory_details:
                 for inventory_detail in inventory_details:
-                    warehouse = Warehouse.objects.get(pk=inventory_detail['warehouseid'])
+                    warehouse = Warehouse.objects.get(pk=inventory_detail['warehouseId'])
                     inventory, created = Inventory.objects.update_or_create(
-                        productid=product,
-                        warehouseid=warehouse,
+                        productId=product,
+                        warehouseId=warehouse,
                         defaults={
-                            'quantityavailable': inventory_detail['quantityavailable'],
-                            'minstocklevel': inventory_detail['minstocklevel'],
-                            'maxstocklevel': inventory_detail['maxstocklevel'],
-                            'invreorderpoint': inventory_detail['invreorderpoint'],
-                            'modifieduser': username
+                            'quantityAvailable': inventory_detail['quantityAvailable'],
+                            'minStockLevel': inventory_detail['minStockLevel'],
+                            'maxStockLevel': inventory_detail['maxStockLevel'],
+                            'invreOrderPoint': inventory_detail['invreOrderPoint'],
+                            'modifiedUser': username
                         }
                     )
 
-            return UpdateProduct(status_code=200, message="Product and inventories updated successfully.")
+            return UpdateProduct(statusCode=200, message="Product and inventories updated successfully.")
         except Product.DoesNotExist:
-            return UpdateProduct(status_code=404, message="Product not found.")
+            return UpdateProduct(statusCode=404, message="Product not found.")
         except Exception as e:
-            return UpdateProduct(status_code=400, message=str(e))
+            return UpdateProduct(statusCode=400, message=str(e))
 
 
 # Mutation for Deleting a Product and its related Inventories
 
 class DeleteProduct(graphene.Mutation):
     class Arguments:
-        product_id = graphene.ID(required=True)
+        productId = graphene.ID(required=True)
 
-    product_id = graphene.ID()
-    status_code = graphene.Int()
+    productId = graphene.ID()
+    statusCode = graphene.Int()
     message = graphene.String()
 
     @login_required
-    def mutate(self, info, product_id):
+    def mutate(self, info, productId):
         try:
             # Soft delete the Product by setting rowstatus to False
-            product = Product.objects.get(pk=product_id)
+            product = Product.objects.get(pk=productId)
             product.rowstatus = False  
             product.save()
 
             # Soft delete related Inventory instances
-            inventories = Inventory.objects.filter(productid=product)
+            inventories = Inventory.objects.filter(productId=product)
             for inventory in inventories:
                 inventory.rowstatus = False
                 inventory.save()
 
-            return DeleteProduct(product_id=product_id, status_code=200, message="Product deleted successfully.")
+            return DeleteProduct(productId=productId, statusCode=200, message="Product deleted successfully.")
         except Product.DoesNotExist:
-            raise Exception(f"Product with id {product_id} does not exist.")
+            raise Exception(f"Product with id {productId} does not exist.")
         except Exception as e:
-            return DeleteProduct(status_code=400, message=str(e))
+            return DeleteProduct(statusCode=400, message=str(e))
 
 
 # Mutation for Creating Warehouses
 
 class CreateWarehouse(graphene.Mutation):
     class Arguments:
-        locationid = graphene.ID(required=True)
-        warehousename = graphene.String(required=True)
+        locationId = graphene.ID(required=True)
+        warehouseName = graphene.String(required=True)
 
     warehouse = graphene.Field(WarehouseType)
-    status_code = graphene.Int()
+    statusCode = graphene.Int()
     message = graphene.String()
 
     @login_required
-    def mutate(self, info, locationid, warehousename):
+    def mutate(self, info, locationId, warehouseName):
         try:
-            location = Location.objects.get(pk=locationid)
+            location = Location.objects.get(pk=locationId)
 
             # Get the username from the token
             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
             username = get_username_from_token(token)
 
             warehouse = Warehouse.objects.create(
-                locationid=location,
-                warehousename=warehousename,
-                createduser=username,
-                modifieduser=username
+                locationId=location,
+                warehouseName=warehouseName,
+                createdUser=username,
+                modifiedUser=username
             )
-            return CreateWarehouse(warehouse=warehouse, status_code=200, message="Warehouse created successfully.")
+            return CreateWarehouse(warehouse=warehouse, statusCode=200, message="Warehouse created successfully.")
         except Location.DoesNotExist:
-            raise Exception(f"Location with id {locationid} does not exist.")
+            raise Exception(f"Location with id {locationId} does not exist.")
         except Exception as e:
-            return CreateWarehouse(status_code=400, message=str(e))
+            return CreateWarehouse(statusCode=400, message=str(e))
 
 # # Mutation for Creating Locations
 
 class CreateLocation(graphene.Mutation):
     class Arguments:
-        locationname = graphene.String(required=True)
-        locationaddress = graphene.String(required=True)
+        locationName = graphene.String(required=True)
+        locationAddress = graphene.String(required=True)
 
     location = graphene.Field(LocationType)
-    status_code = graphene.Int()
+    statusCode = graphene.Int()
     message = graphene.String()
 
     @login_required
-    def mutate(self, info, locationname, locationaddress):
+    def mutate(self, info, locationName, locationAddress):
         try:
 
             # Get the username from the token
@@ -556,126 +561,15 @@ class CreateLocation(graphene.Mutation):
             username = get_username_from_token(token)
 
             location = Location.objects.create(
-                locationname=locationname,
-                locationaddress=locationaddress,
-                createduser=username,
-                modifieduser=username
+                locationName=locationName,
+                locationAddress=locationAddress,
+                createdUser=username,
+                modifiedUser=username
             )
-            return CreateLocation(location=location, status_code=200, message="Location created successfully.")
+            return CreateLocation(location=location, statusCode=200, message="Location created successfully.")
         except Exception as e:
-            return CreateLocation(status_code=400, message=str(e))
-
-
-# # Mutations for Creating, Updating, and Deleting Batches
-
-# class CreateBatch(graphene.Mutation):
-#     batches = graphene.List(BatchType)
-#     status_code = graphene.Int()
-#     message = graphene.String()
-
-#     class Arguments:
-#         productid = graphene.Int(required=True)
-#         manufacturedate = graphene.Date()
-#         expirydate = graphene.Date()
-#         quantity = graphene.String(required=True)
-
-#     @login_required
-#     def mutate(self, info, productid, quantity, manufacturedate=None, expirydate=None):
-#         try:
-#             product = Product.objects.get(productid=productid)
-
-#             # Get the username from the token
-#             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
-#             username = get_username_from_token(token)
-
-#             batch = Batch(
-#                 productid=product,
-#                 manufacturedate=manufacturedate,
-#                 expirydate=expirydate,
-#                 quantity=quantity,
-#                 createduser=username,
-#                 modifieduser=username,
-#                 rowstatus=True
-#             )
-#             batch.save()
-
-#             # Retrieve all batches after creation
-#             batches = Batch.objects.filter(productid=product)
-
-#             return CreateBatch(batches=batches, status_code=200, message="Batch created successfully.")
-#         except Product.DoesNotExist:
-#             return CreateBatch(status_code=404, message="Product not found.")
-#         except Exception as e:
-#             return CreateBatch(status_code=400, message=str(e))
-
-
-
-
-# class UpdateBatch(graphene.Mutation):
-#     batches = graphene.List(BatchType)
-#     status_code = graphene.Int()
-#     message = graphene.String()
-
-#     class Arguments:
-#         batchid = graphene.Int(required=True)
-#         productid = graphene.Int(required=False)
-#         manufacturedate = graphene.Date(required=False)
-#         expirydate = graphene.Date(required=False)
-#         quantity = graphene.String(required=False)
-#         rowstatus = graphene.Boolean(required=False)
-
-#     @login_required
-#     def mutate(self, info, batchid, **kwargs):
-#         try:
-#             batch = Batch.objects.get(batchid=batchid)
-
-#             # Get the username from the token
-#             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
-#             username = get_username_from_token(token)
-
-#             productid = kwargs.get('productid')
-#             if productid:
-#                 product = Product.objects.get(productid=productid)
-#                 batch.productid = product
-
-#             for key, value in kwargs.items():
-#                 if key != 'productid':
-#                     setattr(batch, key, value)
-
-#             batch.modifieduser = username
-#             batch.save()
-
-#             # Retrieve all batches after update
-#             batches = Batch.objects.filter(productid=batch.productid)
-
-#             return UpdateBatch(batches=batches, status_code=200, message="Batch updated successfully.")
-#         except Batch.DoesNotExist:
-#             return UpdateBatch(status_code=404, message="Batch not found.")
-#         except Product.DoesNotExist:
-#             return UpdateBatch(status_code=404, message="Product not found.")
-#         except Exception as e:
-#             return UpdateBatch(status_code=400, message=str(e))
-
-
-# class DeleteBatch(graphene.Mutation):
-#     status_code = graphene.Int()
-#     message = graphene.String()
-
-#     class Arguments:
-#         batchid = graphene.Int(required=True)
-
-#     @login_required
-#     def mutate(self, info, batchid):
-#         try:
-#             batch = Batch.objects.get(batchid=batchid)
-#             batch.rowstatus = False
-#             batch.save()
-#             return DeleteBatch(status_code=200, message="Batch deleted successfully (soft delete).")
-#         except Batch.DoesNotExist:
-#             return DeleteBatch(status_code=404, message="Batch not found.")
-#         except Exception as e:
-#             return DeleteBatch(status_code=400, message=str(e))
-
+            return CreateLocation(statusCode=400, message=str(e))
+        
 
 # Mutations for Creating, Updating, and Deleting Placements
 
@@ -683,7 +577,7 @@ from collections import defaultdict
 from django.db import transaction
 
 class PlacementInputType(graphene.InputObjectType):
-    warehouseid = graphene.Int(required=True)
+    warehouseId = graphene.Int(required=True)
     placementQuantity = graphene.String(required=True)
     aile = graphene.String(required=True)
     bin = graphene.String(required=True)
@@ -694,22 +588,22 @@ from django.db.models import Sum
 
 class CreatePlacement(graphene.Mutation):
     placements = graphene.List(PlacementType)
-    status_code = graphene.Int()
+    statusCode = graphene.Int()
     message = graphene.String()
 
     class Arguments:
-        productid = graphene.Int(required=True)
-        manufacturedate = graphene.Date(required=False)
-        expirydate = graphene.Date(required=False)
+        productId = graphene.Int(required=True)
+        manufactureDate = graphene.Date(required=False)
+        expiryDate = graphene.Date(required=False)
         quantity = graphene.String(required=True)
         placements = graphene.List(PlacementInputType, required=True)
 
     @classmethod
     @login_required
     @transaction.atomic
-    def mutate(cls, root, info, productid, manufacturedate=None, expirydate=None, quantity=None, placements=None):
+    def mutate(cls, root, info, productId, manufactureDate=None, expiryDate=None, quantity=None, placements=None):
         try:
-            product = Product.objects.get(pk=productid)
+            product = Product.objects.get(pk=productId)
 
             # Get the username from the token
             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
@@ -717,12 +611,12 @@ class CreatePlacement(graphene.Mutation):
 
             # Create a new Batch object
             batch = Batch.objects.create(
-                productid=product,
-                manufacturedate=manufacturedate,
-                expirydate=expirydate,
+                productId=product,
+                manufactureDate=manufactureDate,
+                expiryDate=expiryDate,
                 quantity=quantity,
-                createduser=username,
-                modifieduser=username
+                createdUser=username,
+                modifiedUser=username
             )
 
             # Create Placement objects
@@ -731,28 +625,28 @@ class CreatePlacement(graphene.Mutation):
             # Update or create Inventory entries
             cls.update_inventory(product, placements, username)
 
-            return cls(placements=created_placements, status_code=200, message="Placement created successfully.")
+            return cls(placements=created_placements, statusCode=200, message="Placement created successfully.")
         except Product.DoesNotExist:
-            return cls(status_code=404, message=f"Product with id {productid} does not exist.")
+            return cls(statusCode=404, message=f"Product with id {productId} does not exist.")
         except Warehouse.DoesNotExist:
-            return cls(status_code=404, message=f"One or more warehouses do not exist.")
+            return cls(statusCode=404, message=f"One or more warehouses do not exist.")
         except Exception as e:
-            return cls(status_code=400, message=str(e))
+            return cls(statusCode=400, message=str(e))
 
     @classmethod
     def create_placements(cls, batch, product, placements, username):
         created_placements = []
         for placement_input in placements:
-            warehouse = Warehouse.objects.get(pk=placement_input.warehouseid)
+            warehouse = Warehouse.objects.get(pk=placement_input.warehouseId)
             placement = Placement.objects.create(
-                batchid=batch,
-                productid=product,
-                warehouseid=warehouse,
+                batchId=batch,
+                productId=product,
+                warehouseId=warehouse,
                 placementQuantity=placement_input.placementQuantity,
                 aile=placement_input.aile,
                 bin=placement_input.bin,
-                createduser=username,
-                modifieduser=username
+                createdUser=username,
+                modifiedUser=username
             )
             created_placements.append(placement)
         return created_placements
@@ -764,166 +658,44 @@ class CreatePlacement(graphene.Mutation):
         # Calculate total quantities per warehouse
         warehouse_totals = defaultdict(int)
         for placement_input in placements:
-            warehouse_totals[placement_input.warehouseid] += int(placement_input.placementQuantity)
+            warehouse_totals[placement_input.warehouseId] += int(placement_input.placementQuantity)
 
         # Update or create Inventory entries
-        for warehouse_id, total_quantity in warehouse_totals.items():
-            warehouse = Warehouse.objects.get(pk=warehouse_id)
+        for warehouseId, total_quantity in warehouse_totals.items():
+            warehouse = Warehouse.objects.get(pk=warehouseId)
 
             # Calculate total quantity for the warehouse and product
-            total_quantity = Placement.objects.filter(productid=product, warehouseid=warehouse).aggregate(total_quantity=Sum('placementQuantity'))['total_quantity']
+            total_quantity = Placement.objects.filter(productId=product, warehouseId=warehouse).aggregate(total_quantity=Sum('placementQuantity'))['total_quantity']
 
             # Update or create the inventory entry
             inventory, created = Inventory.objects.update_or_create(
-                productid=product,
-                warehouseid=warehouse,
+                productId=product,
+                warehouseId=warehouse,
                 defaults={
-                    'quantityavailable': str(total_quantity),
-                    'createduser': username,
-                    'modifieduser': username
+                    'quantityAvailable': str(total_quantity),
+                    'createdUser': username,
+                    'modifiedUser': username
                 }
             )
             if not created:
                 # Update existing Inventory entry
-                inventory.quantityavailable = str(total_quantity)
-                inventory.modifieduser = username
+                inventory.quantityAvailable = str(total_quantity)
+                inventory.modifiedUser = username
                 inventory.save()
 
         return
 
 
 
-# class CreatePlacement(graphene.Mutation):
-#     placements = graphene.List(PlacementType)
-#     status_code = graphene.Int()
-#     message = graphene.String()
-
-#     class Arguments:
-#         productid = graphene.Int(required=True)
-#         manufacturedate = graphene.Date(required=False)
-#         expirydate = graphene.Date(required=False)
-#         quantity = graphene.String(required=True)
-#         placements = graphene.List(PlacementInputType, required=True)
-
-#     @login_required
-#     @transaction.atomic
-#     def mutate(self, info, productid, manufacturedate=None, expirydate=None, quantity=None, placements=None):
-#         try:
-#             product = Product.objects.get(pk=productid)
-
-#             # Get the username from the token
-#             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
-#             username = get_username_from_token(token)
-
-#             # Create a new Batch object
-#             batch = Batch.objects.create(
-#                 productid=product,
-#                 manufacturedate=manufacturedate,
-#                 expirydate=expirydate,
-#                 quantity=quantity,
-#                 createduser=username,
-#                 modifieduser=username
-#             )
-
-#             # Create Placement objects
-#             created_placements = []
-#             for placement_input in placements:
-#                 warehouse = Warehouse.objects.get(pk=placement_input.warehouseid)
-#                 placement = Placement.objects.create(
-#                     batchid=batch,
-#                     productid=product,
-#                     warehouseid=warehouse,
-#                     placementQuantity=placement_input.placementQuantity,
-#                     aile=placement_input.aile,
-#                     bin=placement_input.bin,
-#                     createduser=username,
-#                     modifieduser=username
-#                 )
-#                 created_placements.append(placement)
-
-#             return CreatePlacement(placements=created_placements, status_code=200, message="Placement created successfully.")
-#         except Product.DoesNotExist:
-#             return CreatePlacement(status_code=404, message=f"Product with id {productid} does not exist.")
-#         except Warehouse.DoesNotExist:
-#             return CreatePlacement(status_code=404, message=f"One or more warehouses do not exist.")
-#         except Exception as e:
-#             return CreatePlacement(status_code=400, message=str(e))
-
-
-
-
-# class CreatePlacement(graphene.Mutation):
-#     placements = graphene.List(PlacementType)
-#     status_code = graphene.Int()
-#     message = graphene.String()
-
-#     class Arguments:
-#         productid = graphene.Int(required=True)
-#         warehouseid = graphene.Int(required=True)
-#         aile = graphene.String(required=True)
-#         bin = graphene.String(required=True)
-#         manufacturedate = graphene.Date(required=False)
-#         expirydate = graphene.Date(required=False)
-#         quantity = graphene.String(required=True)
-#         placementQuantity = graphene.String(required=True)
-
-#     @login_required
-#     @transaction.atomic
-#     def mutate(self, info, productid, warehouseid, aile, bin, manufacturedate=None, expirydate=None, quantity=None, placementQuantity=None):
-#         try:
-#             product = Product.objects.get(pk=productid)
-#             warehouse = Warehouse.objects.get(pk=warehouseid)
-
-#             # Get the username from the token
-#             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
-#             username = get_username_from_token(token)
-
-#             # Create a new Batch object
-#             batch = Batch.objects.create(
-#                 productid=product,
-#                 manufacturedate=manufacturedate,
-#                 expirydate=expirydate,
-#                 quantity=quantity,
-#                 createduser=username,
-#                 modifieduser=username
-#             )
-
-#             # Create a new Placement object
-#             placement = Placement.objects.create(
-#                 batchid=batch,
-#                 productid=product,
-#                 warehouseid=warehouse,
-#                 placementQuantity=placementQuantity,
-#                 aile=aile,
-#                 bin=bin,
-#                 createduser=username,
-#                 modifieduser=username
-#             )
-
-#             # Retrieve placements related to the specific productid
-#             placements = Placement.objects.filter(productid=product)
-
-#             return CreatePlacement(placements=placements, status_code=200, message="Placement created successfully.")
-#         except Product.DoesNotExist:
-#             return CreatePlacement(status_code=404, message=f"Product with id {productid} does not exist.")
-#         except Warehouse.DoesNotExist:
-#             return CreatePlacement(status_code=404, message=f"Warehouse with id {warehouseid} does not exist.")
-#         except Exception as e:
-#             return CreatePlacement(status_code=400, message=str(e))
-
-
-
-
-
 class UpdatePlacement(graphene.Mutation):
     placements = graphene.List(PlacementType)
-    status_code = graphene.Int()
+    statusCode = graphene.Int()
     message = graphene.String()
 
     class Arguments:
         placementId = graphene.Int(required=True)
-        productid = graphene.Int()
-        warehouseid = graphene.Int()
+        productId = graphene.Int()
+        warehouseId = graphene.Int()
         aile = graphene.String()
         bin = graphene.String()
         # batchid = graphene.Int()
@@ -937,52 +709,45 @@ class UpdatePlacement(graphene.Mutation):
             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
             username = get_username_from_token(token)
 
-            productid = kwargs.get('productid')
-            if productid:
+            productId = kwargs.get('productId')
+            if productId:
                 try:
-                    product_instance = Product.objects.get(pk=productid)
-                    placement.productid = product_instance
+                    product_instance = Product.objects.get(pk=productId)
+                    placement.productId = product_instance
                 except Product.DoesNotExist:
-                    return UpdatePlacement(status_code=404, message=f"Product with id {productid} does not exist.")
+                    return UpdatePlacement(statusCode=404, message=f"Product with id {productId} does not exist.")
 
-            warehouseid = kwargs.get('warehouseid')
-            if warehouseid:
+            warehouseId = kwargs.get('warehouseId')
+            if warehouseId:
                 try:
-                    warehouse_instance = Warehouse.objects.get(pk=warehouseid)
-                    placement.warehouseid = warehouse_instance
+                    warehouse_instance = Warehouse.objects.get(pk=warehouseId)
+                    placement.warehouseId = warehouse_instance
                 except Warehouse.DoesNotExist:
-                    return UpdatePlacement(status_code=404, message=f"Warehouse with id {warehouseid} does not exist.")
+                    return UpdatePlacement(statusCode=404, message=f"Warehouse with id {warehouseId} does not exist.")
 
-            # batchid = kwargs.get('batchid')
-            # if batchid:
-            #     try:
-            #         batch_instance = Batch.objects.get(pk=batchid)
-            #         placement.batchid = batch_instance
-            #     except Batch.DoesNotExist:
-            #         return UpdatePlacement(status_code=404, message=f"Batch with id {batchid} does not exist.")
-
+        
             for key, value in kwargs.items():
                 if key in ['aile', 'bin']:
                     setattr(placement, key, value)
 
-            placement.modifieduser = username
+            placement.modifiedUser = username
             placement.save()
 
             # Retrieve all placements related to the updated productid
-            placements = Placement.objects.filter(productid=placement.productid)
+            placements = Placement.objects.filter(productId=placement.productId)
 
-            return UpdatePlacement(placements=placements, status_code=200, message="Placement updated successfully.")
+            return UpdatePlacement(placements=placements, statusCode=200, message="Placement updated successfully.")
         except Placement.DoesNotExist:
-            return UpdatePlacement(status_code=404, message=f"Placement with id {placementId} does not exist.")
+            return UpdatePlacement(statusCode=404, message=f"Placement with id {placementId} does not exist.")
         except Exception as e:
-            return UpdatePlacement(status_code=400, message=str(e))
+            return UpdatePlacement(statusCode=400, message=str(e))
 
 
 class DeletePlacement(graphene.Mutation):
     class Arguments:
         placementId = graphene.Int(required=True)
 
-    status_code = graphene.Int()
+    statusCode = graphene.Int()
     message = graphene.String()
 
     @login_required
@@ -992,11 +757,11 @@ class DeletePlacement(graphene.Mutation):
             placement.rowstatus = False  # Soft delete by setting rowstatus to False
             placement.save()
 
-            return DeletePlacement(status_code=200, message="Placement deleted successfully.")
+            return DeletePlacement(statusCode=200, message="Placement deleted successfully.")
         except Placement.DoesNotExist:
             raise Exception(f"Placement with id {placementId} does not exist.")
         except Exception as e:
-            return DeletePlacement(status_code=400, message=str(e))
+            return DeletePlacement(statusCode=400, message=str(e))
 
 
 #  Mutation for Creating DeleteRequest
@@ -1008,13 +773,13 @@ class CreateDeleteRequest(graphene.Mutation):
     delete_request = graphene.Field(DeleteRequestType)
 
     class Arguments:
-        product_id = graphene.ID(required=True)
+        productId = graphene.ID(required=True)
         message = graphene.String(required=True)
-        approver_id = graphene.Int(required=False)  
+        approverId = graphene.Int(required=False)  
         status = graphene.String(required=False)
 
     @login_required
-    def mutate(self, info, product_id, message, approver_id=None, status=None):
+    def mutate(self, info, productId, message, approverId=None, status=None):
         user = info.context.user
         token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
         
@@ -1022,13 +787,13 @@ class CreateDeleteRequest(graphene.Mutation):
         user_id = decoded_token['id']
 
         user_instance = Login.objects.get(pk=user_id)
-        product_instance = Product.objects.get(pk=product_id)
+        product_instance = Product.objects.get(pk=productId)
 
         delete_request = DeleteRequest.objects.create(
             userId=user_instance,
             productId=product_instance,
             message=message,
-            approverId=approver_id,
+            approverId=approverId,
             status=status
         )
 
@@ -1041,14 +806,14 @@ class CreateRequestProduct(graphene.Mutation):
     request_product = graphene.Field(RequestProductType)
 
     class Arguments:
-        product_id = graphene.ID(required=True)
+        productId = graphene.ID(required=True)
         quantity = graphene.Int(required=True)
-        approved_manager_id = graphene.Int(required=False)  # Optional field
-        approved_admin_id = graphene.Int(required=False)  # Optional field
+        approvedManagerId = graphene.Int(required=False)  # Optional field
+        approvedAdminId = graphene.Int(required=False)  # Optional field
         status = graphene.String(required=True)
 
     @login_required
-    def mutate(self, info, product_id, quantity, status, approved_manager_id=None, approved_admin_id=None):
+    def mutate(self, info, productId, quantity, status, approvedManagerId=None, approvedAdminId=None):
         user = info.context.user
         token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
 
@@ -1056,14 +821,14 @@ class CreateRequestProduct(graphene.Mutation):
         user_id = decoded_token['id']
 
         user_instance = Login.objects.get(pk=user_id)
-        product_instance = Product.objects.get(pk=product_id)
+        product_instance = Product.objects.get(pk=productId)
 
         request_product = RequestProduct.objects.create(
             userId=user_instance,
             productId=product_instance,
             quantity=quantity,
-            approvedManagerId=approved_manager_id,
-            approvedAdminId=approved_admin_id,
+            approvedManagerId=approvedManagerId,
+            approvedAdminId=approvedAdminId,
             status=status,
         )
 
@@ -1078,21 +843,21 @@ class CreateFeature(graphene.Mutation):
 
     class Arguments:
         # Arguments for the mutation
-        stock_control = graphene.Boolean()
-        override_manager_approval = graphene.Boolean()
-        view_product_details = graphene.Boolean()
-        update_stock = graphene.Boolean()
-        delete_product = graphene.Boolean()
-        image_search = graphene.Boolean()
-        qr_scan = graphene.Boolean()
-        qr_generation = graphene.Boolean()
-        add_product = graphene.Boolean()
+        stockControl = graphene.Boolean()
+        overrideManagerApproval = graphene.Boolean()
+        viewProductDetails = graphene.Boolean()
+        updateStock = graphene.Boolean()
+        deleteProduct = graphene.Boolean()
+        imageSearch = graphene.Boolean()
+        qrScan = graphene.Boolean()
+        qrGeneration = graphene.Boolean()
+        addProduct = graphene.Boolean()
         approval = graphene.Boolean()
-        request_product = graphene.Boolean()
+        requestProduct = graphene.Boolean()
         notifications = graphene.Boolean()
-        raise_request = graphene.Boolean()
-        low_stock_items = graphene.Boolean()
-        expiry_date_items = graphene.Boolean()
+        raiseRequest = graphene.Boolean()
+        lowStockItems = graphene.Boolean()
+        expiryDateItems = graphene.Boolean()
 
     @login_required
     def mutate(self, info, **kwargs):
@@ -1114,112 +879,59 @@ class CreateFeature(graphene.Mutation):
 
 
 
-
-
-
-# class BatchDetailType(graphene.ObjectType):
-#     batchid = graphene.Int()
-#     manufacturedate = graphene.Date()
-#     expirydate = graphene.Date()
-#     quantity = graphene.String()
-#     createduser = graphene.String()
-#     modifieduser = graphene.String()
-
-# class InventoryDetailType(graphene.ObjectType):
-#     inventoryid = graphene.Int()
-#     warehouseid = graphene.Int()
-#     minstocklevel = graphene.String()
-#     maxstocklevel = graphene.String()
-#     quantityavailable = graphene.String()
-#     invreorderpoint = graphene.Int()  
-
-
-
-# class PlacementDetailType(graphene.ObjectType):
-#     placementId = graphene.Int()
-#     # warehouseid = graphene.Int()
-#     warehousename = graphene.String()
-#     aile = graphene.String()
-#     bin = graphene.String()
-#     # batchid = graphene.Int()
-
-# class ProductResponseType(graphene.ObjectType):
-#     productid = graphene.Int()
-#     productcode = graphene.String()
-#     qrcode = graphene.String()
-#     productname = graphene.String()
-#     productdescription = graphene.String()
-#     productcategory = graphene.String()
-#     category_name = graphene.String()
-#     reorderpoint = graphene.Int()
-#     brand = graphene.String()
-#     weight = graphene.String()
-#     dimensions = graphene.String()
-#     images = graphene.List(graphene.String)
-#     createduser = graphene.String()
-#     modifieduser = graphene.String()
-#     createdtime = graphene.DateTime()
-#     modifiedtime = graphene.DateTime()
-#     rowstatus = graphene.Boolean()
-#     inventoryDetails = graphene.List(InventoryDetailType)
-#     placementDetails = graphene.List(PlacementDetailType)  # Add this field
-#     # batchDetails = graphene.List(BatchDetailType)  # Add this field
-
 class InventoryDetailType(graphene.ObjectType):
-    inventoryid = graphene.Int()
-    warehouseid = graphene.Int()
-    minstocklevel = graphene.String()
-    maxstocklevel = graphene.String()
-    quantityavailable = graphene.String()
-    invreorderpoint = graphene.Int()
+    inventoryId = graphene.Int()
+    warehouseId = graphene.Int()
+    minStockLevel = graphene.String()
+    maxStockLevel = graphene.String()
+    quantityAvailable = graphene.String(required=False)
+    invreOrderPoint = graphene.Int()
 
 class BatchDetailType(graphene.ObjectType):
-    batchid = graphene.Int()
-    manufacturedate = graphene.Date()
-    expirydate = graphene.Date()
+    batchId = graphene.Int()
+    manufactureDate = graphene.Date()
+    expiryDate = graphene.Date()
     quantity = graphene.String()
-    createduser = graphene.String()
-    modifieduser = graphene.String()
+    createdUser = graphene.String()
+    modifiedUser = graphene.String()
 
-# class PlacementDetailType(graphene.ObjectType):
-#     placementId = graphene.Int()
-#     placementQuantity = graphene.Int()
-#     warehousename = graphene.String()
-#     warehouseid = graphene.Int()
-#     aile = graphene.String()
-#     bin = graphene.String()
-#     batches = graphene.List(BatchDetailType)
 
 class PlacementType(graphene.ObjectType):
+    productId = graphene.Field(ProductType)
+    warehouseId = graphene.Field(WarehouseType)
     placementId = graphene.Int()
     placementQuantity = graphene.Int()
     aile = graphene.String()
     bin = graphene.String()
+    createdUser = graphene.String()
+    modifiedUser = graphene.String()
+    createdTime = graphene.DateTime()
+    modifiedTime = graphene.DateTime()    
     batches = graphene.List(BatchDetailType)
 
 class PlacementDetailType(graphene.ObjectType):
-    warehouseid = graphene.Int()
-    warehousename = graphene.String()
+    warehouseId = graphene.Int()
+    warehouseName = graphene.String()
     placements = graphene.List(PlacementType)
 
 
 class ProductResponseType(graphene.ObjectType):
-    productid = graphene.Int()
-    productcode = graphene.String()
-    qrcode = graphene.String()
-    productname = graphene.String()
-    productdescription = graphene.String()
-    productcategory = graphene.String()
+    productId = graphene.Int()
+    productCode = graphene.String()
+    qrCode = graphene.String()
+    productName = graphene.String()
+    productDescription = graphene.String()
+    productCategory = graphene.String()
     category_name = graphene.String()
-    reorderpoint = graphene.Int()
+    reOrderPoint = graphene.Int()
     brand = graphene.String()
     weight = graphene.String()
     dimensions = graphene.String()
     images = graphene.List(graphene.String)
-    createduser = graphene.String()
-    modifieduser = graphene.String()
-    createdtime = graphene.DateTime()
-    modifiedtime = graphene.DateTime()
+    createdUser = graphene.String()
+    modifiedUser = graphene.String()
+    createdTime = graphene.DateTime()
+    modifiedTime = graphene.DateTime()
     rowstatus = graphene.Boolean()
     inventoryDetails = graphene.List(InventoryDetailType)
     placementDetails = graphene.List(PlacementDetailType)
@@ -1232,7 +944,7 @@ class Query(graphene.ObjectType):
 
     # product = graphene.Field(ProductType, id=graphene.Int(required=True))
     all_products = graphene.List(ProductResponseType)
-    product_response = graphene.Field(ProductResponseType, productid=graphene.Int())
+    product_response = graphene.Field(ProductResponseType, productId=graphene.Int())
 
 
     category = graphene.Field(CategoryType, id=graphene.Int(required=True))
@@ -1240,16 +952,13 @@ class Query(graphene.ObjectType):
 
     inventory = graphene.Field(InventoryType, id=graphene.Int(required=True))
     all_inventories = graphene.List(InventoryType)
-    inventory_by_product = graphene.List(InventoryType, productid=graphene.Int(required=True))
+    inventory_by_product = graphene.List(InventoryType, productId=graphene.Int(required=True))
 
     warehouse = graphene.Field(WarehouseType, id=graphene.ID(required=True))
     all_warehouses = graphene.List(WarehouseType)
 
     all_locations = graphene.List(LocationType)
     location = graphene.Field(LocationType, id=graphene.ID(required=True))
-
-    # all_batches = graphene.List(BatchType)
-    # batch_by_id = graphene.Field(BatchType, batchid=graphene.Int(required=True))
 
     allPlacements = graphene.List(PlacementType)
     placementById = graphene.Field(PlacementType, placementId=graphene.Int(required=True))
@@ -1267,18 +976,6 @@ class Query(graphene.ObjectType):
         except Placement.DoesNotExist:
             return None
         
-    # Fetch all batchs where rowstatus=True
-    # @login_required
-    # def resolve_all_batches(self, info):
-    #     return Batch.objects.filter(rowstatus=True)
-
-    # Fetch a single batch by batchid where rowstatus=True
-    # @login_required
-    # def resolve_batch_by_id(self, info, batchid):
-    #     try:
-    #         return Batch.objects.get(batchid=batchid, rowstatus=True)
-    #     except Batch.DoesNotExist:
-    #         return None
 
     # Fetch all warehouses 
     @login_required                       
@@ -1307,17 +1004,17 @@ class Query(graphene.ObjectType):
         product_responses = []
 
         for product in products:
-            inventories = Inventory.objects.filter(productid=product)
+            inventories = Inventory.objects.filter(productId=product)
 
             inventory_details = []
             for inventory in inventories:
                 inventory_detail = {
-                    'inventoryid': inventory.inventoryid,
-                    'warehouseid': inventory.warehouseid.pk,
-                    'minstocklevel': inventory.minstocklevel,
-                    'maxstocklevel': inventory.maxstocklevel,
-                    'quantityavailable': inventory.quantityavailable,
-                    'invreorderpoint': inventory.invreorderpoint,
+                    'inventoryId': inventory.inventoryId,
+                    'warehouseId': inventory.warehouseId.pk,
+                    'minStockLevel': inventory.minStockLevel,
+                    'maxStockLevel': inventory.maxStockLevel,
+                    'quantityAvailable': inventory.quantityAvailable,
+                    'invreOrderPoint': inventory.invreOrderPoint,
 
             }
                 inventory_details.append(inventory_detail)
@@ -1327,56 +1024,41 @@ class Query(graphene.ObjectType):
                 images_list = json.loads(images_list)
 
         # Fetch category name using the category ID
-            category = Category.objects.get(pk=product.productcategory)
+            category = Category.objects.get(pk=product.productCategory)
             category_name = category.name
 
         # Fetch placements associated with the product
-            placements = Placement.objects.filter(productid=product, rowstatus=True)
+            placements = Placement.objects.filter(productId=product, rowstatus=True)
 
             placement_details = []
             for placement in placements:
                 placement_detail = {
                     'placementId': placement.placementId,
                     # 'warehouseid': placement.warehouseid.pk,
-                    'warehousename': placement.warehouseid.warehousename,  
+                    'warehouseName': placement.warehouseId.warehouseName,  
                     'aile': placement.aile,
                     'bin': placement.bin,
                     # 'batchid': placement.batchid.pk
             }
                 placement_details.append(placement_detail)
 
-        # Fetch batches associated with the product
-            # batches = Batch.objects.filter(productid=product, rowstatus=True)
-
-            # batch_details = []
-            # for batch in batches:
-            #     batch_detail = {
-            #         'batchid': batch.batchid,
-            #         'manufacturedate': batch.manufacturedate,
-            #         'expirydate': batch.expirydate,
-            #         'quantity': batch.quantity,
-            #         'createduser': batch.createduser,
-            #         'modifieduser': batch.modifieduser
-            # }
-            #     batch_details.append(batch_detail)
-
             product_response = ProductResponseType(
-                productid=product.pk,
-                productcode=product.productcode,
-                qrcode=product.qrcode,
-                productname=product.productname,
-                productdescription=product.productdescription,
-                productcategory=str(product.productcategory),
+                productId=product.pk,
+                productCode=product.productCode,
+                qrCode=product.qrCode,
+                productName=product.productName,
+                productDescription=product.productDescription,
+                productCategory=str(product.productCategory),
                 category_name=category_name,
-                reorderpoint=product.reorderpoint,
+                reOrderPoint=product.reOrderPoint,
                 brand=product.brand,
                 weight=product.weight,
                 dimensions=product.dimensions,
                 images=images_list,
-                createduser=product.createduser,
-                modifieduser=product.modifieduser,
-                createdtime=product.createdtime,
-                modifiedtime=product.modifiedtime,
+                createdUser=product.createdUser,
+                modifiedUser=product.modifiedUser,
+                createdTime=product.createdTime,
+                modifiedTime=product.modifiedTime,
                 rowstatus=product.rowstatus,
                 inventoryDetails=inventory_details,
                 placementDetails=placement_details,  # Include placement details
@@ -1407,69 +1089,69 @@ class Query(graphene.ObjectType):
         return Inventory.objects.all()
     
     @login_required                       
-    def resolve_inventory_by_product(self, info, productid):
-        return Inventory.objects.filter(productid=productid)
+    def resolve_inventory_by_product(self, info, productId):
+        return Inventory.objects.filter(productId=productId)
    
     @login_required    
-    def resolve_product_response(self, info, productid=None):
+    def resolve_product_response(self, info, productId=None):
         try:
-            if productid is None:
+            if productId is None:
                 raise Exception("Either productid or productcode must be provided")
 
         # Fetch the product
-            product = Product.objects.get(pk=productid, rowstatus=True)
+            product = Product.objects.get(pk=productId, rowstatus=True)
 
         # Fetch inventories associated with the product
             inventory_details = []
-            inventories = Inventory.objects.filter(productid=product)
+            inventories = Inventory.objects.filter(productId=product)
             for inventory in inventories:
                 inventory_details.append({
-                'inventoryid': inventory.inventoryid,
-                'warehouseid': inventory.warehouseid.pk,
-                'minstocklevel': inventory.minstocklevel,
-                'maxstocklevel': inventory.maxstocklevel,
-                'quantityavailable': str(inventory.quantityavailable),  # Ensure quantityavailable is string
-                'invreorderpoint': inventory.invreorderpoint,
+                'inventoryId': inventory.inventoryId,
+                'warehouseId': inventory.warehouseId.pk,
+                'minStockLevel': inventory.minStockLevel,
+                'maxStockLevel': inventory.maxStockLevel,
+                'quantityAvailable': str(inventory.quantityAvailable),  # Ensure quantityavailable is string
+                'invreOrderPoint': inventory.invreOrderPoint,
             })
 
         # Fetch category name using the category ID
-            category = Category.objects.get(pk=product.productcategory)
+            category = Category.objects.get(pk=product.productCategory)
             category_name = category.name
 
         # Initialize response structure
             response = {
-            'productid': product.pk,
-            'productcode': product.productcode,
-            'qrcode': product.qrcode,
-            'productname': product.productname,
-            'productdescription': product.productdescription,
-            'productcategory': str(product.productcategory),
+            'productId': product.pk,
+            'productCode': product.productCode,
+            'qrCode': product.qrCode,
+            'productName': product.productName,
+            'productDescription': product.productDescription,
+            'productCategory': str(product.productCategory),
             'category_name': category_name,
-            'reorderpoint': product.reorderpoint,
+            'reOrderPoint': product.reOrderPoint,
             'brand': product.brand,
             'weight': product.weight,
             'dimensions': product.dimensions,
             'images': json.loads(product.images),
-            'createduser': product.createduser,
-            'modifieduser': product.modifieduser,
-            'createdtime': product.createdtime,
-            'modifiedtime': product.modifiedtime,
+            'createdUser': product.createdUser,
+            'modifiedUser': product.modifiedUser,
+            'createdTime': product.createdTime,
+            'modifiedTime': product.modifiedTime,
             'rowstatus': product.rowstatus,
             'inventoryDetails': inventory_details,
             'placementDetails': [],  # Initialize placement details as a list
         }
 
         # Fetch placements associated with the product
-            placements = Placement.objects.filter(productid=product, rowstatus=True)
+            placements = Placement.objects.filter(productId=product, rowstatus=True)
 
             warehouse_placements = {}
 
             for placement in placements:
-                warehouse_id = placement.warehouseid.pk
-                if warehouse_id not in warehouse_placements:
-                    warehouse_placements[warehouse_id] = {
-                    'warehouseid': warehouse_id,
-                    'warehousename': placement.warehouseid.warehousename,
+                warehouseId = placement.warehouseId.pk
+                if warehouseId not in warehouse_placements:
+                    warehouse_placements[warehouseId] = {
+                    'warehouseId': warehouseId,
+                    'warehouseName': placement.warehouseId.warehouseName,
                     'placements': []
                 }
 
@@ -1485,16 +1167,16 @@ class Query(graphene.ObjectType):
                 batches = Batch.objects.filter(placement=placement, rowstatus=True)
                 for batch in batches:
                     batch_detail = {
-                    'batchid': batch.batchid,  # Ensure batchid is serialized correctly
-                    'expirydate': batch.expirydate,
-                    'manufacturedate': batch.manufacturedate,
+                    'batchId': batch.batchId,  # Ensure batchid is serialized correctly
+                    'expiryDate': batch.expiryDate,
+                    'manufactureDate': batch.manufactureDate,
                     'quantity': batch.quantity,
-                    'createduser': batch.createduser,
-                    'modifieduser': batch.modifieduser,
+                    'createdUser': batch.createdUser,
+                    'modifiedUser': batch.modifiedUser,
                 }
                     placement_detail['batches'].append(batch_detail)
 
-                warehouse_placements[warehouse_id]['placements'].append(placement_detail)
+                warehouse_placements[warehouseId]['placements'].append(placement_detail)
 
             response['placementDetails'] = list(warehouse_placements.values())
 
@@ -1503,172 +1185,6 @@ class Query(graphene.ObjectType):
         except Product.DoesNotExist:
             return None
 
-
-
-    # def resolve_product_response(self, info, productid=None):
-    #     try:
-    #         if productid is None:
-    #             raise Exception("Either productid or productcode must be provided")
-
-    #     # Fetch the product
-    #         product = Product.objects.get(pk=productid, rowstatus=True)
-
-    #     # Fetch inventories associated with the product
-    #         inventory_details = []
-    #         inventories = Inventory.objects.filter(productid=product)
-    #         for inventory in inventories:
-    #             inventory_details.append({
-    #             'inventoryid': inventory.inventoryid,
-    #             'warehouseid': inventory.warehouseid.pk,
-    #             'minstocklevel': inventory.minstocklevel,
-    #             'maxstocklevel': inventory.maxstocklevel,
-    #             'quantityavailable': str(inventory.quantityavailable),  # Ensure quantityavailable is string
-    #             'invreorderpoint': inventory.invreorderpoint,
-    #         })
-
-    #     # Fetch category name using the category ID
-    #         category = Category.objects.get(pk=product.productcategory)
-    #         category_name = category.name
-
-    #     # Initialize response structure
-    #         response = {
-    #         'productcode': product.productcode,
-    #         'qrcode': product.qrcode,
-    #         'productname': product.productname,
-    #         'productdescription': product.productdescription,
-    #         'productcategory': str(product.productcategory),
-    #         'category_name': category_name,
-    #         'reorderpoint': product.reorderpoint,
-    #         'brand': product.brand,
-    #         'weight': product.weight,
-    #         'dimensions': product.dimensions,
-    #         'images': json.loads(product.images),
-    #         'createduser': product.createduser,
-    #         'modifieduser': product.modifieduser,
-    #         'inventoryDetails': inventory_details,
-    #         'placementDetails': [],  # Initialize placement details
-    #     }
-
-    #     # Fetch placements associated with the product
-    #         placements = Placement.objects.filter(productid=product, rowstatus=True)
-
-    #         for placement in placements:
-    #             placement_detail = {
-    #             'placementId': placement.placementId,
-    #             # 'aile': placement.aile,
-    #             # 'bin': placement.bin,
-    #             'batches': [],  # Initialize batches list
-    #         }
-
-    #         # Fetch batches associated with this placement
-    #             batches = Batch.objects.filter(placement=placement, rowstatus=True)
-    #             for batch in batches:
-    #                 batch_detail = {
-    #                 'batchid': batch.batchid,  # Ensure batchid is serialized correctly
-    #                 'expirydate': batch.expirydate,
-    #                 'manufacturedate': batch.manufacturedate,
-    #                 'quantity': batch.quantity,
-    #                 'createduser': batch.createduser,
-    #                 'modifieduser': batch.modifieduser,
-    #             }
-    #                 placement_detail['batches'].append(batch_detail)
-
-    #         # Fetch warehouse details for the placement
-    #             warehouse_detail = {
-    #             'warehouseid': placement.warehouseid.pk,
-    #             'warehousename': placement.warehouseid.warehousename,
-    #             'placementId': placement.placementId,
-    #             'placementQuantity':placement.placementQuantity,
-    #             'aile': placement.aile,
-    #             'bin': placement.bin,
-    #             'batches': placement_detail['batches'],  # Include batches detail
-    #         }
-                
-
-    #             response['placementDetails'].append(warehouse_detail)
-
-    #         return ProductResponseType(**response)
-
-    #     except Product.DoesNotExist:
-    #         return None
-
-
-    # def resolve_product_response(self, info, productid=None):
-    #     try:
-    #         if productid is not None:
-    #             product = Product.objects.get(pk=productid, rowstatus=True)
-    #         else:
-    #             raise Exception("Either productid or productcode must be provided")
-
-    #         inventories = Inventory.objects.filter(productid=product)
-
-    #         inventory_details = []
-    #         for inventory in inventories:
-    #             inventory_detail = {
-    #                 'inventoryid': inventory.inventoryid,
-    #                 'warehouseid': inventory.warehouseid.pk,
-    #                 'minstocklevel': inventory.minstocklevel,
-    #                 'maxstocklevel': inventory.maxstocklevel,
-    #                 'quantityavailable': inventory.quantityavailable,
-    #                 'invreorderpoint' : inventory.invreorderpoint,
-
-    #         }
-    #             inventory_details.append(inventory_detail)
-
-    #     # Fetch category name using the category ID
-    #         category = Category.objects.get(pk=product.productcategory)
-    #         category_name = category.name
-
-    #     # Fetch placements associated with the product
-    #         placements = Placement.objects.filter(productid=product, rowstatus=True)
-
-    #         placement_details = []
-    #         for placement in placements:
-    #             placement_detail = {
-    #                 'placementId': placement.placementId,
-    #                 # 'warehouseid': placement.warehouseid.pk,
-    #                 'warehousename': placement.warehouseid.warehousename,  
-    #                 'aile': placement.aile,
-    #                 'bin': placement.bin,
-    #                 # 'batchid': placement.batchid.pk
-    #         }
-    #             placement_details.append(placement_detail)
-
-    #     # Fetch batches associated with the product
-    #         batches = Batch.objects.filter(productid=product, rowstatus=True)
-
-    #         batch_details = []
-    #         for batch in batches:
-    #             batch_detail = {
-    #                 'batchid': batch.batchid,
-    #                 'manufacturedate': batch.manufacturedate,
-    #                 'expirydate': batch.expirydate,
-    #                 'quantity': batch.quantity,
-    #                 'createduser': batch.createduser,
-    #                 'modifieduser': batch.modifieduser
-    #         }
-    #             batch_details.append(batch_detail)
-
-    #         return ProductResponseType(
-    #             productcode=product.productcode,
-    #             qrcode=product.qrcode,
-    #             productname=product.productname,
-    #             productdescription=product.productdescription,
-    #             productcategory=str(product.productcategory),
-    #             category_name=category_name,
-    #             reorderpoint=product.reorderpoint,
-    #             brand=product.brand,
-    #             weight=product.weight,
-    #             dimensions=product.dimensions,
-    #             images=json.loads(product.images),
-    #             createduser=product.createduser,
-    #             modifieduser=product.modifieduser,
-    #             inventoryDetails=inventory_details,
-    #             placementDetails=placement_details,  # Include placement details
-    #             batchDetails=batch_details  # Include batch details
-    #     )
-    #     except Product.DoesNotExist:
-    #         return None
 
 
 # Root Mutation class to define all mutations
@@ -1684,10 +1200,6 @@ class Mutation(graphene.ObjectType):
     create_category = CreateCategory.Field()
     update_category = UpdateCategory.Field()
     delete_category = DeleteCategory.Field()
-
-    # create_batch = CreateBatch.Field()
-    # update_batch = UpdateBatch.Field()
-    # delete_batch = DeleteBatch.Field()
 
     create_placement = CreatePlacement.Field()
     update_placement = UpdatePlacement.Field()
