@@ -1395,91 +1395,9 @@ class Query(graphene.ObjectType):
     @login_required                       
     def resolve_inventory_by_product(self, info, productid):
         return Inventory.objects.filter(productid=productid)
-   
-    @login_required       
-    # def resolve_product_response(self, info, productid=None):
-    #     try:
-    #         if productid is None:
-    #             raise Exception("Either productid or productcode must be provided")
 
-    #     # Fetch the product
-    #         product = Product.objects.get(pk=productid, rowstatus=True)
-
-    #     # Fetch inventories associated with the product
-    #         inventory_details = []
-    #         inventories = Inventory.objects.filter(productid=product)
-    #         for inventory in inventories:
-    #             inventory_details.append({
-    #             'inventoryid': inventory.inventoryid,
-    #             'warehouseid': inventory.warehouseid.pk,
-    #             'minstocklevel': inventory.minstocklevel,
-    #             'maxstocklevel': inventory.maxstocklevel,
-    #             'quantityavailable': inventory.quantityavailable,
-    #             'invreorderpoint': inventory.invreorderpoint,
-    #         })
-
-    #     # Fetch category name using the category ID
-    #         category = Category.objects.get(pk=product.productcategory)
-    #         category_name = category.name
-
-    #     # Initialize response structure
-    #         response = {
-    #         'productcode': product.productcode,
-    #         'qrcode': product.qrcode,
-    #         'productname': product.productname,
-    #         'productdescription': product.productdescription,
-    #         'productcategory': str(product.productcategory),
-    #         'category_name': category_name,
-    #         'reorderpoint': product.reorderpoint,
-    #         'brand': product.brand,
-    #         'weight': product.weight,
-    #         'dimensions': product.dimensions,
-    #         'images': json.loads(product.images),
-    #         'createduser': product.createduser,
-    #         'modifieduser': product.modifieduser,
-    #         'inventoryDetails': inventory_details,
-    #         'placementDetails': [],  # Initialize placement details
-    #     }
-
-    #     # Fetch placements associated with the product
-    #         placements = Placement.objects.filter(productid=product, rowstatus=True)
-
-    #         for placement in placements:
-    #             placement_detail = {
-    #             'placementId': placement.placementId,
-    #             'aile': placement.aile,
-    #             'bin': placement.bin,
-    #             'placementQuantity': placement.placementQuantity,
-    #             'batch': [],
-    #         }
-
-    #         # Fetch batches associated with this placement
-    #             batches = Batch.objects.filter(batchid=placement.batchid.batchid, rowstatus=True)
-    #             for batch in batches:
-    #                 batch_detail = {
-    #                 'batchid': batch.batchid,  # Ensure batchid is serialized correctly
-    #                 'expirydate': batch.expirydate,
-    #                 'manufacturedate': batch.manufacturedate,
-    #                 'quantity': batch.quantity,
-    #                 'createduser': batch.createduser,
-    #                 'modifieduser': batch.modifieduser,
-    #             }
-    #                 placement_detail['batch'].append(batch_detail)
-
-    #         # Fetch warehouse details for the placement
-    #             warehouse_detail = {
-    #             'warehouseid': placement.warehouseid.pk,
-    #             'warehousename': placement.warehouseid.warehousename,
-    #             'placement': [placement_detail],  # Include placement detail
-    #         }
-
-    #             response['placementDetails'].append(warehouse_detail)
-
-    #         return ProductResponseType(**response)
-
-    #     except Product.DoesNotExist:
-    #         return None
-
+    
+    @login_required
     def resolve_product_response(self, info, productid=None):
         try:
             if productid is None:
@@ -1567,83 +1485,7 @@ class Query(graphene.ObjectType):
             return None
 
 
-    # def resolve_product_response(self, info, productid=None):
-    #     try:
-    #         if productid is not None:
-    #             product = Product.objects.get(pk=productid, rowstatus=True)
-    #         else:
-    #             raise Exception("Either productid or productcode must be provided")
-
-    #         inventories = Inventory.objects.filter(productid=product)
-
-    #         inventory_details = []
-    #         for inventory in inventories:
-    #             inventory_detail = {
-    #                 'inventoryid': inventory.inventoryid,
-    #                 'warehouseid': inventory.warehouseid.pk,
-    #                 'minstocklevel': inventory.minstocklevel,
-    #                 'maxstocklevel': inventory.maxstocklevel,
-    #                 'quantityavailable': inventory.quantityavailable,
-    #                 'invreorderpoint' : inventory.invreorderpoint,
-
-    #         }
-    #             inventory_details.append(inventory_detail)
-
-    #     # Fetch category name using the category ID
-    #         category = Category.objects.get(pk=product.productcategory)
-    #         category_name = category.name
-
-    #     # Fetch placements associated with the product
-    #         placements = Placement.objects.filter(productid=product, rowstatus=True)
-
-    #         placement_details = []
-    #         for placement in placements:
-    #             placement_detail = {
-    #                 'placementId': placement.placementId,
-    #                 # 'warehouseid': placement.warehouseid.pk,
-    #                 'warehousename': placement.warehouseid.warehousename,  
-    #                 'aile': placement.aile,
-    #                 'bin': placement.bin,
-    #                 # 'batchid': placement.batchid.pk
-    #         }
-    #             placement_details.append(placement_detail)
-
-    #     # Fetch batches associated with the product
-    #         batches = Batch.objects.filter(productid=product, rowstatus=True)
-
-    #         batch_details = []
-    #         for batch in batches:
-    #             batch_detail = {
-    #                 'batchid': batch.batchid,
-    #                 'manufacturedate': batch.manufacturedate,
-    #                 'expirydate': batch.expirydate,
-    #                 'quantity': batch.quantity,
-    #                 'createduser': batch.createduser,
-    #                 'modifieduser': batch.modifieduser
-    #         }
-    #             batch_details.append(batch_detail)
-
-    #         return ProductResponseType(
-    #             productcode=product.productcode,
-    #             qrcode=product.qrcode,
-    #             productname=product.productname,
-    #             productdescription=product.productdescription,
-    #             productcategory=str(product.productcategory),
-    #             category_name=category_name,
-    #             reorderpoint=product.reorderpoint,
-    #             brand=product.brand,
-    #             weight=product.weight,
-    #             dimensions=product.dimensions,
-    #             images=json.loads(product.images),
-    #             createduser=product.createduser,
-    #             modifieduser=product.modifieduser,
-    #             inventoryDetails=inventory_details,
-    #             placementDetails=placement_details,  # Include placement details
-    #             batchDetails=batch_details  # Include batch details
-    #     )
-    #     except Product.DoesNotExist:
-    #         return None
-
+   
 
 # Root Mutation class to define all mutations
 
