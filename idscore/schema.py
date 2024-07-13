@@ -1398,7 +1398,7 @@ class Query(graphene.ObjectType):
 
     
     @login_required
-    def resolve_product_response(self, info, productid=None):
+    def resolve_productResponse(self, info, productid=None):
         try:
             if productid is None:
                 raise Exception("Either productid or productcode must be provided")
