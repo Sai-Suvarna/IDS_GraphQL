@@ -366,11 +366,12 @@ class CreateProduct(graphene.Mutation):
             # Create Inventory instances related to the Product
             for inventory_detail in inventory_details:
                 warehouse = Warehouse.objects.get(pk=inventory_detail['warehouseid'])
+                quantityavailable = inventory_detail.get('quantityavailable', None)  # Default to None if not provided
                 inventory, created = Inventory.objects.get_or_create(
                     productid=product,
                     warehouseid=warehouse,
                     defaults={
-                        'quantityavailable': inventory_detail['quantityavailable'],
+                        'quantityavailable': quantityavailable,
                         'minstocklevel': inventory_detail['minstocklevel'],
                         'maxstocklevel': inventory_detail['maxstocklevel'],
                         'invreorderpoint': inventory_detail['invreorderpoint'],
@@ -380,7 +381,7 @@ class CreateProduct(graphene.Mutation):
                 )
                 if not created:
                     # If inventory entry already exists, update it
-                    inventory.quantityavailable = inventory_detail['quantityavailable']
+                    inventory.quantityavailable = quantityavailable
                     inventory.minstocklevel = inventory_detail['minstocklevel']
                     inventory.maxstocklevel = inventory_detail['maxstocklevel']
                     inventory.invreorderpoint = inventory_detail['invreorderpoint']
@@ -390,7 +391,7 @@ class CreateProduct(graphene.Mutation):
             return CreateProduct(status_code=200, message="Product and inventories created successfully.")
         except Exception as e:
             return CreateProduct(status_code=400, message=str(e))
-
+            
 class UpdateProduct(graphene.Mutation):
     class Arguments:
         product_id = graphene.ID(required=True)
