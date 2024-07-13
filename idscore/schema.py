@@ -1180,14 +1180,27 @@ class BatchDetailType(graphene.ObjectType):
     createduser = graphene.String()
     modifieduser = graphene.String()
 
-class PlacementDetailType(graphene.ObjectType):
+# class PlacementDetailType(graphene.ObjectType):
+#     placementId = graphene.Int()
+#     placementQuantity = graphene.Int()
+#     warehousename = graphene.String()
+#     warehouseid = graphene.Int()
+#     aile = graphene.String()
+#     bin = graphene.String()
+#     batches = graphene.List(BatchDetailType)
+
+class PlacementType(graphene.ObjectType):
     placementId = graphene.Int()
     placementQuantity = graphene.Int()
-    warehousename = graphene.String()
-    warehouseid = graphene.Int()
     aile = graphene.String()
     bin = graphene.String()
     batches = graphene.List(BatchDetailType)
+
+class PlacementDetailType(graphene.ObjectType):
+    warehouseid = graphene.Int()
+    warehousename = graphene.String()
+    placements = graphene.List(PlacementType)
+
 
 class ProductResponseType(graphene.ObjectType):
     productid = graphene.Int()
@@ -1395,10 +1408,9 @@ class Query(graphene.ObjectType):
     @login_required                       
     def resolve_inventory_by_product(self, info, productid):
         return Inventory.objects.filter(productid=productid)
-
-    
-    @login_required
-    def resolve_productResponse(self, info, productid=None):
+   
+    @login_required    
+    def resolve_product_response(self, info, productid=None):
         try:
             if productid is None:
                 raise Exception("Either productid or productcode must be provided")
@@ -1425,6 +1437,7 @@ class Query(graphene.ObjectType):
 
         # Initialize response structure
             response = {
+            'productid': product.pk,
             'productcode': product.productcode,
             'qrcode': product.qrcode,
             'productname': product.productname,
@@ -1438,19 +1451,33 @@ class Query(graphene.ObjectType):
             'images': json.loads(product.images),
             'createduser': product.createduser,
             'modifieduser': product.modifieduser,
+            'createdtime': product.createdtime,
+            'modifiedtime': product.modifiedtime,
+            'rowstatus': product.rowstatus,
             'inventoryDetails': inventory_details,
-            'placementDetails': [],  # Initialize placement details
+            'placementDetails': [],  # Initialize placement details as a list
         }
 
         # Fetch placements associated with the product
             placements = Placement.objects.filter(productid=product, rowstatus=True)
 
+            warehouse_placements = {}
+
             for placement in placements:
+                warehouse_id = placement.warehouseid.pk
+                if warehouse_id not in warehouse_placements:
+                    warehouse_placements[warehouse_id] = {
+                    'warehouseid': warehouse_id,
+                    'warehousename': placement.warehouseid.warehousename,
+                    'placements': []
+                }
+
                 placement_detail = {
                 'placementId': placement.placementId,
-                # 'aile': placement.aile,
-                # 'bin': placement.bin,
-                'batches': [],  # Initialize batches list
+                'placementQuantity': placement.placementQuantity,
+                'aile': placement.aile,
+                'bin': placement.bin,
+                'batches': []
             }
 
             # Fetch batches associated with this placement
@@ -1466,18 +1493,9 @@ class Query(graphene.ObjectType):
                 }
                     placement_detail['batches'].append(batch_detail)
 
-            # Fetch warehouse details for the placement
-                warehouse_detail = {
-                'warehouseid': placement.warehouseid.pk,
-                'warehousename': placement.warehouseid.warehousename,
-                'placementId': placement.placementId,
-                'placementQuantity':placement.placementQuantity,
-                'aile': placement.aile,
-                'bin': placement.bin,
-                'batches': placement_detail['batches'],  # Include batches detail
-            }
+                warehouse_placements[warehouse_id]['placements'].append(placement_detail)
 
-                response['placementDetails'].append(warehouse_detail)
+            response['placementDetails'] = list(warehouse_placements.values())
 
             return ProductResponseType(**response)
 
@@ -1485,7 +1503,172 @@ class Query(graphene.ObjectType):
             return None
 
 
-   
+
+    # def resolve_product_response(self, info, productid=None):
+    #     try:
+    #         if productid is None:
+    #             raise Exception("Either productid or productcode must be provided")
+
+    #     # Fetch the product
+    #         product = Product.objects.get(pk=productid, rowstatus=True)
+
+    #     # Fetch inventories associated with the product
+    #         inventory_details = []
+    #         inventories = Inventory.objects.filter(productid=product)
+    #         for inventory in inventories:
+    #             inventory_details.append({
+    #             'inventoryid': inventory.inventoryid,
+    #             'warehouseid': inventory.warehouseid.pk,
+    #             'minstocklevel': inventory.minstocklevel,
+    #             'maxstocklevel': inventory.maxstocklevel,
+    #             'quantityavailable': str(inventory.quantityavailable),  # Ensure quantityavailable is string
+    #             'invreorderpoint': inventory.invreorderpoint,
+    #         })
+
+    #     # Fetch category name using the category ID
+    #         category = Category.objects.get(pk=product.productcategory)
+    #         category_name = category.name
+
+    #     # Initialize response structure
+    #         response = {
+    #         'productcode': product.productcode,
+    #         'qrcode': product.qrcode,
+    #         'productname': product.productname,
+    #         'productdescription': product.productdescription,
+    #         'productcategory': str(product.productcategory),
+    #         'category_name': category_name,
+    #         'reorderpoint': product.reorderpoint,
+    #         'brand': product.brand,
+    #         'weight': product.weight,
+    #         'dimensions': product.dimensions,
+    #         'images': json.loads(product.images),
+    #         'createduser': product.createduser,
+    #         'modifieduser': product.modifieduser,
+    #         'inventoryDetails': inventory_details,
+    #         'placementDetails': [],  # Initialize placement details
+    #     }
+
+    #     # Fetch placements associated with the product
+    #         placements = Placement.objects.filter(productid=product, rowstatus=True)
+
+    #         for placement in placements:
+    #             placement_detail = {
+    #             'placementId': placement.placementId,
+    #             # 'aile': placement.aile,
+    #             # 'bin': placement.bin,
+    #             'batches': [],  # Initialize batches list
+    #         }
+
+    #         # Fetch batches associated with this placement
+    #             batches = Batch.objects.filter(placement=placement, rowstatus=True)
+    #             for batch in batches:
+    #                 batch_detail = {
+    #                 'batchid': batch.batchid,  # Ensure batchid is serialized correctly
+    #                 'expirydate': batch.expirydate,
+    #                 'manufacturedate': batch.manufacturedate,
+    #                 'quantity': batch.quantity,
+    #                 'createduser': batch.createduser,
+    #                 'modifieduser': batch.modifieduser,
+    #             }
+    #                 placement_detail['batches'].append(batch_detail)
+
+    #         # Fetch warehouse details for the placement
+    #             warehouse_detail = {
+    #             'warehouseid': placement.warehouseid.pk,
+    #             'warehousename': placement.warehouseid.warehousename,
+    #             'placementId': placement.placementId,
+    #             'placementQuantity':placement.placementQuantity,
+    #             'aile': placement.aile,
+    #             'bin': placement.bin,
+    #             'batches': placement_detail['batches'],  # Include batches detail
+    #         }
+                
+
+    #             response['placementDetails'].append(warehouse_detail)
+
+    #         return ProductResponseType(**response)
+
+    #     except Product.DoesNotExist:
+    #         return None
+
+
+    # def resolve_product_response(self, info, productid=None):
+    #     try:
+    #         if productid is not None:
+    #             product = Product.objects.get(pk=productid, rowstatus=True)
+    #         else:
+    #             raise Exception("Either productid or productcode must be provided")
+
+    #         inventories = Inventory.objects.filter(productid=product)
+
+    #         inventory_details = []
+    #         for inventory in inventories:
+    #             inventory_detail = {
+    #                 'inventoryid': inventory.inventoryid,
+    #                 'warehouseid': inventory.warehouseid.pk,
+    #                 'minstocklevel': inventory.minstocklevel,
+    #                 'maxstocklevel': inventory.maxstocklevel,
+    #                 'quantityavailable': inventory.quantityavailable,
+    #                 'invreorderpoint' : inventory.invreorderpoint,
+
+    #         }
+    #             inventory_details.append(inventory_detail)
+
+    #     # Fetch category name using the category ID
+    #         category = Category.objects.get(pk=product.productcategory)
+    #         category_name = category.name
+
+    #     # Fetch placements associated with the product
+    #         placements = Placement.objects.filter(productid=product, rowstatus=True)
+
+    #         placement_details = []
+    #         for placement in placements:
+    #             placement_detail = {
+    #                 'placementId': placement.placementId,
+    #                 # 'warehouseid': placement.warehouseid.pk,
+    #                 'warehousename': placement.warehouseid.warehousename,  
+    #                 'aile': placement.aile,
+    #                 'bin': placement.bin,
+    #                 # 'batchid': placement.batchid.pk
+    #         }
+    #             placement_details.append(placement_detail)
+
+    #     # Fetch batches associated with the product
+    #         batches = Batch.objects.filter(productid=product, rowstatus=True)
+
+    #         batch_details = []
+    #         for batch in batches:
+    #             batch_detail = {
+    #                 'batchid': batch.batchid,
+    #                 'manufacturedate': batch.manufacturedate,
+    #                 'expirydate': batch.expirydate,
+    #                 'quantity': batch.quantity,
+    #                 'createduser': batch.createduser,
+    #                 'modifieduser': batch.modifieduser
+    #         }
+    #             batch_details.append(batch_detail)
+
+    #         return ProductResponseType(
+    #             productcode=product.productcode,
+    #             qrcode=product.qrcode,
+    #             productname=product.productname,
+    #             productdescription=product.productdescription,
+    #             productcategory=str(product.productcategory),
+    #             category_name=category_name,
+    #             reorderpoint=product.reorderpoint,
+    #             brand=product.brand,
+    #             weight=product.weight,
+    #             dimensions=product.dimensions,
+    #             images=json.loads(product.images),
+    #             createduser=product.createduser,
+    #             modifieduser=product.modifieduser,
+    #             inventoryDetails=inventory_details,
+    #             placementDetails=placement_details,  # Include placement details
+    #             batchDetails=batch_details  # Include batch details
+    #     )
+    #     except Product.DoesNotExist:
+    #         return None
+
 
 # Root Mutation class to define all mutations
 
