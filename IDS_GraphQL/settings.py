@@ -127,14 +127,13 @@ GRAPHENE = {
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'ides_productdetails',
+        'NAME': 'ides_productdetails_ol5x',
         'USER': 'suvarna',
-        'PASSWORD': 'WtP73JWm7n1DOlCcVAsdngc7xL9DNf5C',
-        'HOST': 'dpg-cplbrp0cmk4c739lfam0-a.oregon-postgres.render.com',
+        'PASSWORD': 'KtduvdhHJ4bnyWDFBMTdpGFZt2uWjtjn',
+        'HOST': 'dpg-cq96255ds78s73993s8g-a.oregon-postgres.render.com',
         'PORT': '5432',
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
