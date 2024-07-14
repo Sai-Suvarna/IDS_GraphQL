@@ -19,10 +19,10 @@ class InventoryType(DjangoObjectType):
     class Meta:
         model = Inventory
     
-    def resolve_warehouseid(self, info):
+    def resolve_warehouseId(self, info):
         return self.warehouseId.pk  # Return the primary key of the warehouse
     
-    def resolve_warehousename(self, info):
+    def resolve_warehouseName(self, info):
         # Resolve warehousename from the related Warehouse object
         return self.warehouseId.warehouseName if self.warehouseId else None
 
@@ -53,7 +53,6 @@ class BatchType(DjangoObjectType):
 class PlacementType(DjangoObjectType):
     productId = graphene.Field(ProductType)
     warehouseId = graphene.Field(WarehouseType)
-
     warehouseName = graphene.String()
 
     class Meta:
@@ -168,10 +167,10 @@ class CreateInventory(graphene.Mutation):
 
     class Arguments:
         productId = graphene.ID(required=True)
-        quantityAvailable = graphene.String()
+        quantityAvailable = graphene.String(required=False, default_value=None)  
         minStockLevel = graphene.String(required=True)
         maxStockLevel = graphene.String(required=True)
-        invreOrderPoint = graphene.Int()  # Optional argument
+        invreOrderPoint = graphene.Int()  
         warehouseId = graphene.ID(required=True)
         rowstatus = graphene.Boolean(default_value=True)
 
@@ -186,14 +185,15 @@ class CreateInventory(graphene.Mutation):
             username = get_username_from_token(token)
 
             # Set default values or handle None
-            invreOrderPoint = kwargs.get('invreorderpoint', None)
+            invreOrderPoint = kwargs.get('invreOrderPoint', None)
+            quantityAvailable = kwargs.get('quantityAvailable', None)
 
             # Use get_or_create to handle unique constraint
             inventory, created = Inventory.objects.get_or_create(
                 productId=product,
                 warehouseId=warehouse,
                 defaults={
-                    'quantityAvailable': kwargs['quantityAvailable'],
+                    'quantityAvailable': quantityAvailable,
                     'minStockLevel': kwargs['minStockLevel'],
                     'maxStockLevel': kwargs['maxStockLevel'],
                     'invreOrderPoint': invreOrderPoint,
@@ -205,7 +205,7 @@ class CreateInventory(graphene.Mutation):
 
             if not created:
                 # If the inventory entry already exists, update it
-                inventory.quantityAvailable = kwargs['quantityAvailable']
+                inventory.quantityAvailable = quantityAvailable if quantityAvailable is not None else inventory.quantityAvailable
                 inventory.minStockLevel = kwargs['minStockLevel']
                 inventory.maxStockLevel = kwargs['maxStockLevel']
                 inventory.invreOrderPoint = invreOrderPoint
@@ -882,6 +882,7 @@ class CreateFeature(graphene.Mutation):
 class InventoryDetailType(graphene.ObjectType):
     inventoryId = graphene.Int()
     warehouseId = graphene.Int()
+    warehouseName = graphene.String()
     minStockLevel = graphene.String()
     maxStockLevel = graphene.String()
     quantityAvailable = graphene.String(required=False)
@@ -998,75 +999,172 @@ class Query(graphene.ObjectType):
         return Location.objects.get(pk=id)
 
     # Fetch all products and related inventories where rowstatus=True
-    @login_required                   
+    @login_required             
     def resolve_all_products(self, info):
-        products = Product.objects.filter(rowstatus=True)
-        product_responses = []
+        try:
+            products = Product.objects.filter(rowstatus=True)
+            product_responses = []
 
-        for product in products:
-            inventories = Inventory.objects.filter(productId=product)
-
-            inventory_details = []
-            for inventory in inventories:
-                inventory_detail = {
+            for product in products:
+            # Fetch inventories associated with the product
+                inventory_details = []
+                inventories = Inventory.objects.filter(productId=product)
+                for inventory in inventories:
+                    inventory_details.append({
                     'inventoryId': inventory.inventoryId,
                     'warehouseId': inventory.warehouseId.pk,
+                    'warehouseName': inventory.warehouseId.warehouseName,
                     'minStockLevel': inventory.minStockLevel,
                     'maxStockLevel': inventory.maxStockLevel,
-                    'quantityAvailable': inventory.quantityAvailable,
+                    'quantityAvailable': str(inventory.quantityAvailable),  # Ensure quantityAvailable is a string
                     'invreOrderPoint': inventory.invreOrderPoint,
+                })
 
+            # Fetch category name using the category ID
+                category = Category.objects.get(pk=product.productCategory)
+                category_name = category.name
+
+            # Initialize response structure
+                response = {
+                'productId': product.pk,
+                'productCode': product.productCode,
+                'qrCode': product.qrCode,
+                'productName': product.productName,
+                'productDescription': product.productDescription,
+                'productCategory': str(product.productCategory),
+                'category_name': category_name,
+                'reOrderPoint': product.reOrderPoint,
+                'brand': product.brand,
+                'weight': product.weight,
+                'dimensions': product.dimensions,
+                'images': json.loads(product.images) if isinstance(product.images, str) else product.images,
+                'createdUser': product.createdUser,
+                'modifiedUser': product.modifiedUser,
+                'createdTime': product.createdTime,
+                'modifiedTime': product.modifiedTime,
+                'rowstatus': product.rowstatus,
+                'inventoryDetails': inventory_details,
+                'placementDetails': [],  # Initialize placement details as a list
             }
-                inventory_details.append(inventory_detail)
 
-            images_list = product.images
-            if isinstance(images_list, str):
-                images_list = json.loads(images_list)
+            # Fetch placements associated with the product
+                placements = Placement.objects.filter(productId=product, rowstatus=True)
 
-        # Fetch category name using the category ID
-            category = Category.objects.get(pk=product.productCategory)
-            category_name = category.name
+                warehouse_placements = {}
 
-        # Fetch placements associated with the product
-            placements = Placement.objects.filter(productId=product, rowstatus=True)
+                for placement in placements:
+                    warehouseId = placement.warehouseId.pk
+                    if warehouseId not in warehouse_placements:
+                        warehouse_placements[warehouseId] = {
+                        'warehouseId': warehouseId,
+                        'warehouseName': placement.warehouseId.warehouseName,
+                        'placements': []
+                    }
 
-            placement_details = []
-            for placement in placements:
-                placement_detail = {
+                    placement_detail = {
                     'placementId': placement.placementId,
-                    # 'warehouseid': placement.warehouseid.pk,
-                    'warehouseName': placement.warehouseId.warehouseName,  
+                    'placementQuantity': placement.placementQuantity,
                     'aile': placement.aile,
                     'bin': placement.bin,
-                    # 'batchid': placement.batchid.pk
-            }
-                placement_details.append(placement_detail)
+                    'batches': []
+                }
 
-            product_response = ProductResponseType(
-                productId=product.pk,
-                productCode=product.productCode,
-                qrCode=product.qrCode,
-                productName=product.productName,
-                productDescription=product.productDescription,
-                productCategory=str(product.productCategory),
-                category_name=category_name,
-                reOrderPoint=product.reOrderPoint,
-                brand=product.brand,
-                weight=product.weight,
-                dimensions=product.dimensions,
-                images=images_list,
-                createdUser=product.createdUser,
-                modifiedUser=product.modifiedUser,
-                createdTime=product.createdTime,
-                modifiedTime=product.modifiedTime,
-                rowstatus=product.rowstatus,
-                inventoryDetails=inventory_details,
-                placementDetails=placement_details,  # Include placement details
-                # batchDetails=batch_details  # Include batch details
-        )
-            product_responses.append(product_response)
+                # Fetch batches associated with this placement
+                    batches = Batch.objects.filter(placement=placement, rowstatus=True)
+                    for batch in batches:
+                        batch_detail = {
+                        'batchId': batch.batchId,  # Ensure batchId is serialized correctly
+                        'expiryDate': batch.expiryDate,
+                        'manufactureDate': batch.manufactureDate,
+                        'quantity': batch.quantity,
+                        'createdUser': batch.createdUser,
+                        'modifiedUser': batch.modifiedUser,
+                    }
+                        placement_detail['batches'].append(batch_detail)
 
-        return product_responses
+                    warehouse_placements[warehouseId]['placements'].append(placement_detail)
+
+                response['placementDetails'] = list(warehouse_placements.values())
+
+                product_responses.append(ProductResponseType(**response))
+
+            return product_responses
+
+        except Product.DoesNotExist:
+            return None
+
+
+
+
+
+    # def resolve_all_products(self, info):
+    #     products = Product.objects.filter(rowstatus=True)
+    #     product_responses = []
+
+    #     for product in products:
+    #         inventories = Inventory.objects.filter(productId=product)
+
+    #         inventory_details = []
+    #         for inventory in inventories:
+    #             inventory_detail = {
+    #                 'inventoryId': inventory.inventoryId,
+    #                 'warehouseId': inventory.warehouseId.pk,
+    #                 'minStockLevel': inventory.minStockLevel,
+    #                 'maxStockLevel': inventory.maxStockLevel,
+    #                 'quantityAvailable': inventory.quantityAvailable,
+    #                 'invreOrderPoint': inventory.invreOrderPoint,
+
+    #         }
+    #             inventory_details.append(inventory_detail)
+
+    #         images_list = product.images
+    #         if isinstance(images_list, str):
+    #             images_list = json.loads(images_list)
+
+    #     # Fetch category name using the category ID
+    #         category = Category.objects.get(pk=product.productCategory)
+    #         category_name = category.name
+
+    #     # Fetch placements associated with the product
+    #         placements = Placement.objects.filter(productId=product, rowstatus=True)
+
+    #         placement_details = []
+    #         for placement in placements:
+    #             placement_detail = {
+    #                 'placementId': placement.placementId,
+    #                 # 'warehouseid': placement.warehouseid.pk,
+    #                 'warehouseName': placement.warehouseId.warehouseName,  
+    #                 'aile': placement.aile,
+    #                 'bin': placement.bin,
+    #                 # 'batchid': placement.batchid.pk
+    #         }
+    #             placement_details.append(placement_detail)
+
+    #         product_response = ProductResponseType(
+    #             productId=product.pk,
+    #             productCode=product.productCode,
+    #             qrCode=product.qrCode,
+    #             productName=product.productName,
+    #             productDescription=product.productDescription,
+    #             productCategory=str(product.productCategory),
+    #             category_name=category_name,
+    #             reOrderPoint=product.reOrderPoint,
+    #             brand=product.brand,
+    #             weight=product.weight,
+    #             dimensions=product.dimensions,
+    #             images=images_list,
+    #             createdUser=product.createdUser,
+    #             modifiedUser=product.modifiedUser,
+    #             createdTime=product.createdTime,
+    #             modifiedTime=product.modifiedTime,
+    #             rowstatus=product.rowstatus,
+    #             inventoryDetails=inventory_details,
+    #             placementDetails=placement_details,  # Include placement details
+    #             # batchDetails=batch_details  # Include batch details
+    #     )
+    #         product_responses.append(product_response)
+
+    #     return product_responses
     
     # Fetch a single category by id where rowstatus=True
     @login_required                       
@@ -1108,6 +1206,7 @@ class Query(graphene.ObjectType):
                 inventory_details.append({
                 'inventoryId': inventory.inventoryId,
                 'warehouseId': inventory.warehouseId.pk,
+                'warehouseName': inventory.warehouseId.warehouseName,
                 'minStockLevel': inventory.minStockLevel,
                 'maxStockLevel': inventory.maxStockLevel,
                 'quantityAvailable': str(inventory.quantityAvailable),  # Ensure quantityavailable is string
