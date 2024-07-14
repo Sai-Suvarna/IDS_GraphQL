@@ -577,17 +577,47 @@ from collections import defaultdict
 from django.db import transaction
 
 class PlacementInputType(graphene.InputObjectType):
+    placementId = graphene.Int()
     warehouseId = graphene.Int(required=True)
     placementQuantity = graphene.String(required=True)
     aile = graphene.String(required=True)
     bin = graphene.String(required=True)
 
 
+
+class BatchDetailType(graphene.ObjectType):
+    batchId = graphene.Int()
+    manufactureDate = graphene.Date()
+    expiryDate = graphene.Date()
+    quantity = graphene.String()
+    createdUser = graphene.String()
+    modifiedUser = graphene.String()
+
+
+class PlacementType(graphene.ObjectType):
+    productId = graphene.Field(ProductType)
+    warehouseId = graphene.Field(WarehouseType)
+    placementId = graphene.Int()
+    placementQuantity = graphene.Int()
+    aile = graphene.String()
+    bin = graphene.String()
+    createdUser = graphene.String()
+    modifiedUser = graphene.String()
+    createdTime = graphene.DateTime()
+    modifiedTime = graphene.DateTime()    
+    batches = graphene.List(BatchDetailType)
+
+class PlacementDetailType(graphene.ObjectType):
+    warehouseId = graphene.Int()
+    productId = graphene.Int()
+    warehouseName = graphene.String()
+    placements = graphene.List(PlacementType)
+
 from django.db import transaction
 from django.db.models import Sum
 
 class CreatePlacement(graphene.Mutation):
-    placements = graphene.List(PlacementType)
+    placementDetails = graphene.List(PlacementDetailType)
     statusCode = graphene.Int()
     message = graphene.String()
 
@@ -625,7 +655,10 @@ class CreatePlacement(graphene.Mutation):
             # Update or create Inventory entries
             cls.update_inventory(product, placements, username)
 
-            return cls(placements=created_placements, statusCode=200, message="Placement created successfully.")
+            # Retrieve all placement details related to the productId after creation
+            placement_details = cls.get_placement_details(product)
+
+            return cls(placementDetails=placement_details, statusCode=200, message="Placement created successfully.")
         except Product.DoesNotExist:
             return cls(statusCode=404, message=f"Product with id {productId} does not exist.")
         except Warehouse.DoesNotExist:
@@ -685,62 +718,236 @@ class CreatePlacement(graphene.Mutation):
 
         return
 
+    @classmethod
+    def get_placement_details(cls, product):
+    # Retrieve all placements related to the product
+        placements = Placement.objects.filter(productId=product)
+        warehouse_details = {}
+
+        for placement in placements:
+            warehouse_id = placement.warehouseId.pk
+            product_id = placement.productId.pk
+            if warehouse_id not in warehouse_details:
+                warehouse_details[warehouse_id] = {
+                'warehouseId': warehouse_id,
+                'warehouseName': placement.warehouseId.warehouseName,
+                'productId': product_id,
+                'placements': []
+            }
+
+            batch = placement.batchId
+            placement_detail = {
+            'placementId': placement.pk,
+            'placementQuantity': placement.placementQuantity,
+            'aile': placement.aile,
+            'bin': placement.bin,
+            'batches': [{
+                'manufactureDate': batch.manufactureDate,
+                'expiryDate': batch.expiryDate,
+                'quantity': batch.quantity,
+            }]
+        }
+            warehouse_details[warehouse_id]['placements'].append(placement_detail)
+
+        return list(warehouse_details.values())
 
 
 class UpdatePlacement(graphene.Mutation):
-    placements = graphene.List(PlacementType)
+    placementDetails = graphene.List(PlacementDetailType)
     statusCode = graphene.Int()
     message = graphene.String()
 
     class Arguments:
         placementId = graphene.Int(required=True)
-        productId = graphene.Int()
-        warehouseId = graphene.Int()
-        aile = graphene.String()
-        bin = graphene.String()
-        # batchid = graphene.Int()
+        productId = graphene.Int(required=True)
+        manufactureDate = graphene.Date(required=False)
+        expiryDate = graphene.Date(required=False)
+        quantity = graphene.String(required=True)
+        placements = graphene.List(PlacementInputType, required=True)
 
+    @classmethod
     @login_required
-    def mutate(self, info, placementId, **kwargs):
+    @transaction.atomic
+    def mutate(cls, root, info, placementId, productId, manufactureDate=None, expiryDate=None, quantity=None, placements=None):
         try:
-            placement = Placement.objects.get(pk=placementId)
+            product = Product.objects.get(pk=productId)
 
             # Get the username from the token
             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
             username = get_username_from_token(token)
 
-            productId = kwargs.get('productId')
-            if productId:
-                try:
-                    product_instance = Product.objects.get(pk=productId)
-                    placement.productId = product_instance
-                except Product.DoesNotExist:
-                    return UpdatePlacement(statusCode=404, message=f"Product with id {productId} does not exist.")
+            # Retrieve the Batch object associated with the Placement
+            placement = Placement.objects.get(pk=placementId)
+            batch = placement.batchId
 
-            warehouseId = kwargs.get('warehouseId')
-            if warehouseId:
-                try:
-                    warehouse_instance = Warehouse.objects.get(pk=warehouseId)
-                    placement.warehouseId = warehouse_instance
-                except Warehouse.DoesNotExist:
-                    return UpdatePlacement(statusCode=404, message=f"Warehouse with id {warehouseId} does not exist.")
+            # Update the Batch object
+            batch.manufactureDate = manufactureDate
+            batch.expiryDate = expiryDate
+            batch.quantity = quantity
+            batch.modifiedUser = username
+            batch.save()
 
-        
-            for key, value in kwargs.items():
-                if key in ['aile', 'bin']:
-                    setattr(placement, key, value)
+            # Update the Placement objects
+            updated_placements = cls.update_placements(batch, product, placements, username)
 
+            # Update or create Inventory entries
+            cls.update_inventory(product, placements, username)
+
+            # Retrieve all placement details related to the productId after update
+            placement_details = cls.get_placement_details(product)
+
+            return cls(placementDetails=placement_details, statusCode=200, message="Placement updated successfully.")
+        except Product.DoesNotExist:
+            return cls(statusCode=404, message=f"Product with id {productId} does not exist.")
+        except Placement.DoesNotExist:
+            return cls(statusCode=404, message=f"Placement with id {placementId} does not exist.")
+        except Warehouse.DoesNotExist:
+            return cls(statusCode=404, message=f"One or more warehouses do not exist.")
+        except Exception as e:
+            return cls(statusCode=400, message=str(e))
+
+    @classmethod
+    def update_placements(cls, batch, product, placements, username):
+        updated_placements = []
+        for placement_input in placements:
+            warehouse = Warehouse.objects.get(pk=placement_input.warehouseId)
+            placement = Placement.objects.get(pk=placement_input.placementId)
+            placement.batchId = batch
+            placement.productId = product
+            placement.warehouseId = warehouse
+            placement.placementQuantity = placement_input.placementQuantity
+            placement.aile = placement_input.aile
+            placement.bin = placement_input.bin
             placement.modifiedUser = username
             placement.save()
+            updated_placements.append(placement)
+        return updated_placements
 
-            # Retrieve all placements related to the updated productid
-            placements = Placement.objects.filter(productId=placement.productId)
+    @classmethod
+    def update_inventory(cls, product, placements, username):
+        from collections import defaultdict
 
-            return UpdatePlacement(placements=placements, statusCode=200, message="Placement updated successfully.")
-        except Placement.DoesNotExist:
-            return UpdatePlacement(statusCode=404, message=f"Placement with id {placementId} does not exist.")
-        except Exception as e:
-            return UpdatePlacement(statusCode=400, message=str(e))
+        # Calculate total quantities per warehouse
+        warehouse_totals = defaultdict(int)
+        for placement_input in placements:
+            warehouse_totals[placement_input.warehouseId] += int(placement_input.placementQuantity)
+
+        # Update or create Inventory entries
+        for warehouseId, total_quantity in warehouse_totals.items():
+            warehouse = Warehouse.objects.get(pk=warehouseId)
+
+            # Calculate total quantity for the warehouse and product
+            total_quantity = Placement.objects.filter(productId=product, warehouseId=warehouse).aggregate(total_quantity=Sum('placementQuantity'))['total_quantity']
+
+            # Update or create the inventory entry
+            inventory, created = Inventory.objects.update_or_create(
+                productId=product,
+                warehouseId=warehouse,
+                defaults={
+                    'quantityAvailable': str(total_quantity),
+                    'createdUser': username,
+                    'modifiedUser': username
+                }
+            )
+            if not created:
+                # Update existing Inventory entry
+                inventory.quantityAvailable = str(total_quantity)
+                inventory.modifiedUser = username
+                inventory.save()
+
+        return
+
+    @classmethod
+    def get_placement_details(cls, product):
+        # Retrieve all placements related to the product
+        placements = Placement.objects.filter(productId=product)
+        warehouse_details = {}
+
+        for placement in placements:
+            warehouse_id = placement.warehouseId.pk
+            product_id = placement.productId.pk
+            if warehouse_id not in warehouse_details:
+                warehouse_details[warehouse_id] = {
+                    'warehouseId': warehouse_id,
+                    'warehouseName': placement.warehouseId.warehouseName,
+                    'productId': product_id,
+                    'placements': []
+                }
+
+            batch = placement.batchId
+            placement_detail = {
+                'placementId': placement.pk,
+                'placementQuantity': placement.placementQuantity,
+                'aile': placement.aile,
+                'bin': placement.bin,
+                'batches': [{
+                    'manufactureDate': batch.manufactureDate,
+                    'expiryDate': batch.expiryDate,
+                    'quantity': batch.quantity,
+                }]
+            }
+            warehouse_details[warehouse_id]['placements'].append(placement_detail)
+
+        return list(warehouse_details.values())
+
+
+
+    
+
+# class UpdatePlacement(graphene.Mutation):
+#     placements = graphene.List(PlacementType)
+#     statusCode = graphene.Int()
+#     message = graphene.String()
+
+#     class Arguments:
+#         placementId = graphene.Int(required=True)
+#         productId = graphene.Int()
+#         warehouseId = graphene.Int()
+#         aile = graphene.String()
+#         bin = graphene.String()
+#         # batchid = graphene.Int()
+
+#     @login_required
+#     def mutate(self, info, placementId, **kwargs):
+#         try:
+#             placement = Placement.objects.get(pk=placementId)
+
+#             # Get the username from the token
+#             token = info.context.META.get('HTTP_AUTHORIZATION').split(' ')[1]
+#             username = get_username_from_token(token)
+
+#             productId = kwargs.get('productId')
+#             if productId:
+#                 try:
+#                     product_instance = Product.objects.get(pk=productId)
+#                     placement.productId = product_instance
+#                 except Product.DoesNotExist:
+#                     return UpdatePlacement(statusCode=404, message=f"Product with id {productId} does not exist.")
+
+#             warehouseId = kwargs.get('warehouseId')
+#             if warehouseId:
+#                 try:
+#                     warehouse_instance = Warehouse.objects.get(pk=warehouseId)
+#                     placement.warehouseId = warehouse_instance
+#                 except Warehouse.DoesNotExist:
+#                     return UpdatePlacement(statusCode=404, message=f"Warehouse with id {warehouseId} does not exist.")
+
+        
+#             for key, value in kwargs.items():
+#                 if key in ['aile', 'bin']:
+#                     setattr(placement, key, value)
+
+#             placement.modifiedUser = username
+#             placement.save()
+
+#             # Retrieve all placements related to the updated productid
+#             placements = Placement.objects.filter(productId=placement.productId)
+
+#             return UpdatePlacement(placements=placements, statusCode=200, message="Placement updated successfully.")
+#         except Placement.DoesNotExist:
+#             return UpdatePlacement(statusCode=404, message=f"Placement with id {placementId} does not exist.")
+#         except Exception as e:
+#             return UpdatePlacement(statusCode=400, message=str(e))
 
 
 class DeletePlacement(graphene.Mutation):
@@ -888,32 +1095,32 @@ class InventoryDetailType(graphene.ObjectType):
     quantityAvailable = graphene.String(required=False)
     invreOrderPoint = graphene.Int()
 
-class BatchDetailType(graphene.ObjectType):
-    batchId = graphene.Int()
-    manufactureDate = graphene.Date()
-    expiryDate = graphene.Date()
-    quantity = graphene.String()
-    createdUser = graphene.String()
-    modifiedUser = graphene.String()
+# class BatchDetailType(graphene.ObjectType):
+#     batchId = graphene.Int()
+#     manufactureDate = graphene.Date()
+#     expiryDate = graphene.Date()
+#     quantity = graphene.String()
+#     createdUser = graphene.String()
+#     modifiedUser = graphene.String()
 
 
-class PlacementType(graphene.ObjectType):
-    productId = graphene.Field(ProductType)
-    warehouseId = graphene.Field(WarehouseType)
-    placementId = graphene.Int()
-    placementQuantity = graphene.Int()
-    aile = graphene.String()
-    bin = graphene.String()
-    createdUser = graphene.String()
-    modifiedUser = graphene.String()
-    createdTime = graphene.DateTime()
-    modifiedTime = graphene.DateTime()    
-    batches = graphene.List(BatchDetailType)
+# class PlacementType(graphene.ObjectType):
+#     productId = graphene.Field(ProductType)
+#     warehouseId = graphene.Field(WarehouseType)
+#     placementId = graphene.Int()
+#     placementQuantity = graphene.Int()
+#     aile = graphene.String()
+#     bin = graphene.String()
+#     createdUser = graphene.String()
+#     modifiedUser = graphene.String()
+#     createdTime = graphene.DateTime()
+#     modifiedTime = graphene.DateTime()    
+#     batches = graphene.List(BatchDetailType)
 
-class PlacementDetailType(graphene.ObjectType):
-    warehouseId = graphene.Int()
-    warehouseName = graphene.String()
-    placements = graphene.List(PlacementType)
+# class PlacementDetailType(graphene.ObjectType):
+#     warehouseId = graphene.Int()
+#     warehouseName = graphene.String()
+#     placements = graphene.List(PlacementType)
 
 
 class ProductResponseType(graphene.ObjectType):
@@ -961,21 +1168,113 @@ class Query(graphene.ObjectType):
     all_locations = graphene.List(LocationType)
     location = graphene.Field(LocationType, id=graphene.ID(required=True))
 
-    allPlacements = graphene.List(PlacementType)
-    placementById = graphene.Field(PlacementType, placementId=graphene.Int(required=True))
+    # allPlacements = graphene.List(PlacementType)
+    # placementById = graphene.Field(PlacementType, placementId=graphene.Int(required=True))
 
-    # Fetch all placements where rowstatus=True
+    placementDetails = graphene.List(PlacementDetailType)
+    placementById = graphene.Field(PlacementDetailType, placementId=graphene.Int(required=True))
+
+
     @login_required
-    def resolve_allPlacements(self, info):
-        return Placement.objects.filter(rowstatus=True)
-            
-    # Fetch a single placement by placementId where rowstatus=True
+    def resolve_placementDetails(self, info):
+        from collections import defaultdict
+
+        # Fetch all placements with rowstatus=True
+        placements = Placement.objects.filter(rowstatus=True)
+
+        # Group placements by warehouse
+        warehouse_placements = defaultdict(list)
+        for placement in placements:
+            warehouse_placements[placement.warehouseId.pk].append(placement)
+
+        # Create the response format
+        response = []
+        for warehouseId, placements in warehouse_placements.items():
+            warehouse = Warehouse.objects.get(pk=warehouseId)
+            placement_list = []
+            for placement in placements:
+                batch = placement.batchId  # Assuming Placement model has a ForeignKey to Batch model
+                placement_detail = PlacementType(
+                    placementId=placement.pk,
+                    placementQuantity=placement.placementQuantity,
+                    aile=placement.aile,
+                    bin=placement.bin,
+                    createdUser=placement.createdUser,
+                    modifiedUser=placement.modifiedUser,
+                    createdTime=placement.createdTime,
+                    modifiedTime=placement.modifiedTime,
+                    batches=[
+                        BatchDetailType(
+                            batchId=batch.pk,
+                            manufactureDate=batch.manufactureDate,
+                            expiryDate=batch.expiryDate,
+                            quantity=batch.quantity,
+                            createdUser=batch.createdUser,
+                            modifiedUser=batch.modifiedUser
+                        )
+                    ]
+                )
+                placement_list.append(placement_detail)
+            response.append(PlacementDetailType(
+                warehouseId=warehouseId,
+                warehouseName=warehouse.warehouseName,
+                placements=placement_list
+            ))
+
+        return response
+
     @login_required
     def resolve_placementById(self, info, placementId):
         try:
-            return Placement.objects.get(pk=placementId, rowstatus=True)
+            # Fetch the placement by placementId
+            placement = Placement.objects.get(pk=placementId, rowstatus=True)
+
+            # Create the response format
+            warehouse = placement.warehouseId
+            batch = placement.batchId  # Assuming Placement model has a ForeignKey to Batch model
+            placement_detail = PlacementType(
+                placementId=placement.pk,
+                placementQuantity=placement.placementQuantity,
+                aile=placement.aile,
+                bin=placement.bin,
+                createdUser=placement.createdUser,
+                modifiedUser=placement.modifiedUser,
+                createdTime=placement.createdTime,
+                modifiedTime=placement.modifiedTime,
+                batches=[
+                    BatchDetailType(
+                        batchId=batch.pk,
+                        manufactureDate=batch.manufactureDate,
+                        expiryDate=batch.expiryDate,
+                        quantity=batch.quantity,
+                        createdUser=batch.createdUser,
+                        modifiedUser=batch.modifiedUser
+                    )
+                ]
+            )
+
+            return PlacementDetailType(
+                warehouseId=warehouse.pk,
+                warehouseName=warehouse.warehouseName,
+                placements=[placement_detail]
+            )
         except Placement.DoesNotExist:
             return None
+
+
+
+    # # Fetch all placements where rowstatus=True
+    # @login_required
+    # def resolve_allPlacements(self, info):
+    #     return Placement.objects.filter(rowstatus=True)
+            
+    # # Fetch a single placement by placementId where rowstatus=True
+    # @login_required
+    # def resolve_placementById(self, info, placementId):
+    #     try:
+    #         return Placement.objects.get(pk=placementId, rowstatus=True)
+    #     except Placement.DoesNotExist:
+    #         return None
         
 
     # Fetch all warehouses 
